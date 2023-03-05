@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_name_key">profile_name</string>
+    <string name="server_key">server</string>
+    <string name="server_port_key">server_port</string>
+    <string name="user_id_key">user_id</string>
+    <string name="server_name_indication_key">server_name_indication</string>
+    <string name="server_service_name_key">server_service_name</string>
+    <string name="server_mux_key">server_mux</string>
+    <string name="server_buffer_key">server_buffer</string>
+    <string name="dns_key">dns</string>
+    <string name="server_tls_key">server_tls</string>
+    <string name="server_bypass_key">server_bypass</string>
+    <string name="server_advanced_route_toggle_key">server_advanced_route_toggle</string>
+    <string name="inbound_socks_key">inbound_socks</string>
+    <string name="inbound_http_key">inbound_http</string>
+    <string name="service_autostart_key">service_autostart</string>
+    <string name="service_restart_on_oom_key">service_restart_on_oom</string>
+</resources>

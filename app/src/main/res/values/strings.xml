@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Spaceship</string>
+    <string name="title_home">Home</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_logs">Logs</string>
+
+    <!-- Preference Entry-->
+    <string name="preference_settings_key">settings</string>
+    <string name="root_preference_key">org.starx.spaceship_preferences</string>
+    <!-- Preference Titles -->
+    <string name="messages_header">Messages</string>
+    <string name="server_settings">Server Settings</string>
+
+    <!-- Settings Preferences -->
+    <string name="profile_name">Profile Name</string>
+    <string name="reply_title">Default reply action</string>
+
+    <!-- Server Settings Preferences -->
+    <string name="server">Server</string>
+    <string name="remote_port">Remote Port</string>
+
+    <string name="user_id">User ID</string>
+    <string name="uuid">UUID</string>
+    <string name="spaceship_upper">SPACESHIP</string>
+    <string name="connect_upper">CONNECT</string>
+    <string name="none">N/A</string>
+    <string name="exportConfig">Export</string>
+    <string name="importConfig">Import</string>
+</resources>
