@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import org.starx.spaceship.MainActivity
 import org.starx.spaceship.R
 import org.starx.spaceship.helper.Helper
+import org.starx.spaceship.helper.IStatusListener
 
 class Background : Service() {
     companion object{
@@ -40,7 +41,14 @@ class Background : Service() {
         if (intent != null && !running) {
             running = true
             val s = intent.getStringExtra("config")!!
-            helper = Helper(s)
+            helper = Helper(s, object : IStatusListener {
+                override fun onExit() {
+                    if (running) {
+                        stopSelf()
+                        Toast.makeText(applicationContext, "spaceship exited unexpectedly", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            })
             helper.start()
             Toast.makeText(applicationContext, "Service thread started", Toast.LENGTH_SHORT)
                 .show()

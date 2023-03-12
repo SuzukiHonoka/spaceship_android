@@ -2,7 +2,7 @@ package org.starx.spaceship.helper
 
 import android.util.Log
 
-class Helper(private val config: String) {
+class Helper(private val config: String, private var listener: IStatusListener? = null) {
 
     companion object{
         const val TAG = "Helper"
@@ -11,6 +11,7 @@ class Helper(private val config: String) {
     private val launcher = spaceship_aar.Spaceship_aar.newLauncher()
     private val process = Thread {
         launcher.launchFromString(config)
+        listener?.onExit()
     }
 
     fun start() {
