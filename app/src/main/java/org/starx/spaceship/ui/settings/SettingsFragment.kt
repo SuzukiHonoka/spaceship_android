@@ -28,13 +28,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        requireActivity().addMenuProvider(object : MenuProvider{
+        requireActivity().addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
                 menuInflater.inflate(R.menu.configuration_menu, menu)
             }
 
             override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                return when (menuItem.itemId){
+                return when (menuItem.itemId) {
                     R.id.action_export -> {
                         handleExport()
                         true
@@ -52,10 +52,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
         return super.onCreateView(inflater, container, savedInstanceState)
     }
 
-    private fun handleImport(){
+    private fun handleImport() {
         val ctx = requireContext()
         val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        if (!clipboardManager.hasPrimaryClip()){
+        if (!clipboardManager.hasPrimaryClip()) {
             Toast.makeText(ctx, "Copy configuration to clipboard first!", Toast.LENGTH_SHORT).show()
             return
         }
@@ -63,7 +63,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         try {
             val cfg = JsonFactory.processor.decodeFromString(Configuration.serializer(), clip)
             Settings(ctx).saveConfiguration(cfg)
-        }catch (e: java.lang.Exception){
+        } catch (e: java.lang.Exception) {
             Log.e("PARSE", "$clip\n$e")
             Toast.makeText(ctx, "parse configuration failed: $e", Toast.LENGTH_SHORT).show()
             return
@@ -71,7 +71,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         Toast.makeText(ctx, "Configuration imported", Toast.LENGTH_SHORT).show()
     }
 
-    private fun handleExport(){
+    private fun handleExport() {
         val ctx = requireContext()
         val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clipData = ClipData.newPlainText("config", Settings(ctx).toJson())
@@ -88,10 +88,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
-    private fun applyConstrains(){
+    private fun applyConstrains() {
         EditTextUtil(findPreference(getString(R.string.server_port_key))!!).setNumberOnly(1, 65535)
         EditTextUtil(findPreference(getString(R.string.server_mux_key))!!).setNumberOnly(0, 255)
-        EditTextUtil(findPreference(getString(R.string.server_buffer_key))!!).setNumberOnly(1, 65535).setSuffix("KB")
+        EditTextUtil(findPreference(getString(R.string.server_buffer_key))!!).setNumberOnly(
+            1,
+            65535
+        ).setSuffix("KB")
         EditTextUtil(findPreference(getString(R.string.user_id_key))!!).setPasswordWithMask()
     }
 }

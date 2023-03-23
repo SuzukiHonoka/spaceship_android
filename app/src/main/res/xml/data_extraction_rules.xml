@@ -5,11 +5,19 @@
 -->
 <data-extraction-rules>
     <cloud-backup disableIfNoEncryptionCapabilities="true">
-        <include domain="sharedpref" path="."/>
-        <exclude domain="sharedpref" path="settings.xml"/>
+        <include
+            domain="sharedpref"
+            path="." />
+        <exclude
+            domain="sharedpref"
+            path="settings.xml" />
     </cloud-backup>
     <device-transfer>
-        <include domain="sharedpref" path="."/>
-        <exclude domain="sharedpref" path="settings.xml"/>
+        <include
+            domain="sharedpref"
+            path="." />
+        <exclude
+            domain="sharedpref"
+            path="settings.xml" />
     </device-transfer>
 </data-extraction-rules>

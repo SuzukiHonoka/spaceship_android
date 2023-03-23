@@ -4,16 +4,14 @@
 
     <item
         android:id="@+id/action_export"
-        android:title="@string/exportConfig"
         android:icon="@drawable/share"
-        app:showAsAction="ifRoom">
-    </item>
+        android:title="@string/exportConfig"
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/action_import"
-        android:title="@string/importConfig"
         android:icon="@drawable/add"
-        app:showAsAction="ifRoom">
-    </item>
+        android:title="@string/importConfig"
+        app:showAsAction="ifRoom" />
 
 </menu>

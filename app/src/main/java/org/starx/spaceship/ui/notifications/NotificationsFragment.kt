@@ -34,15 +34,13 @@ class NotificationsFragment : Fragment() {
             //Toast.makeText(requireContext(), "ok", Toast.LENGTH_SHORT).show()
         }
 
-        val logScroll  = binding.logsScroll
+        val logScroll = binding.logsScroll
 
-        notificationsViewModel.logs.observe(viewLifecycleOwner){
-            logs ->
+        notificationsViewModel.logs.observe(viewLifecycleOwner) { logs ->
             logsView.text = logs
             if (autoScrolling) logScroll.fullScroll(View.FOCUS_DOWN)
         }
-        notificationsViewModel.logCatOutput().observe(viewLifecycleOwner){
-            line ->
+        notificationsViewModel.logCatOutput().observe(viewLifecycleOwner) { line ->
             if (line.contains("GoLog")) notificationsViewModel.addLogs(line)
         }
         return root

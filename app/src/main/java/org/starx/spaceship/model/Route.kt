@@ -8,7 +8,7 @@ data class Route(
     var path: String? = null,
 )
 
-enum class BuiltinRoute(val route: Route){
+enum class BuiltinRoute(val route: Route) {
     ROUTE_BYPASS_DOMAINS(
         Route(
             RouteType.TYPE_DOMAINS.type,

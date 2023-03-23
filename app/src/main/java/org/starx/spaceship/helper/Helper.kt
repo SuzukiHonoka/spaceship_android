@@ -4,7 +4,7 @@ import android.util.Log
 
 class Helper(private val config: String, private var listener: IStatusListener? = null) {
 
-    companion object{
+    companion object {
         const val TAG = "Helper"
     }
 

@@ -3,7 +3,7 @@ package org.starx.spaceship.ui.home
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 
-class HomeViewModel: ViewModel() {
+class HomeViewModel : ViewModel() {
     private val _profile = MutableLiveData<String>().apply {
         value = ""
     }

@@ -7,10 +7,11 @@ import java.io.FileOutputStream
 import java.io.IOException
 
 class Resource(private val ctx: Context) {
-    companion object{
+    companion object {
         const val TAG = "Resource"
     }
-    fun extract(){
+
+    fun extract() {
         val assets = ctx.assets
         val files = assets.list("opt")!!
 
@@ -26,8 +27,8 @@ class Resource(private val ctx: Context) {
                 inStream.close()
                 outStream.close()
             }
-        }catch (e: IOException){
-            Log.e(TAG, "extract: $e" )
+        } catch (e: IOException) {
+            Log.e(TAG, "extract: $e")
         }
     }
 }

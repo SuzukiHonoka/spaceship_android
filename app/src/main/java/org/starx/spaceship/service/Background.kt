@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
@@ -17,14 +18,16 @@ import org.starx.spaceship.R
 import org.starx.spaceship.helper.Helper
 import org.starx.spaceship.helper.IStatusListener
 
+
 class Background : Service() {
-    companion object{
+    companion object {
         const val TAG = "Service"
         const val CHANNEL_ID = "Spaceship"
         const val CHANNEL_NAME = "Background indicator"
     }
 
     private var running = false
+    private var failed = false
 
     private lateinit var helper: Helper
 
@@ -66,7 +69,7 @@ class Background : Service() {
         return START_NOT_STICKY
     }
 
-    private fun applyForeground(){
+    private fun applyForeground() {
         val serviceChannel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
@@ -76,9 +79,11 @@ class Background : Service() {
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(serviceChannel)
         if (!notificationManager.areNotificationsEnabled()) {
-            Toast.makeText(this,
+            Toast.makeText(
+                this,
                 "Notifications not enabled, please allow it to run foreground service",
-                Toast.LENGTH_SHORT).show()
+                Toast.LENGTH_SHORT
+            ).show()
         }
         val notificationIntent = Intent(this, MainActivity::class.java)
 
@@ -102,7 +107,6 @@ class Background : Service() {
         }.build()
         startForeground(1, notification)
     }
-
 
 
     override fun onDestroy() {

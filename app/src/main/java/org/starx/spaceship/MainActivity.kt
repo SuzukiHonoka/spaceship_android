@@ -33,7 +33,8 @@ class MainActivity : AppCompatActivity() {
 
         val navView: BottomNavigationView = binding.navView
 
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment
+        val navHostFragment =
+            supportFragmentManager.findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment
         val navController = navHostFragment.navController
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
@@ -58,8 +59,9 @@ class MainActivity : AppCompatActivity() {
     ) {
         if (requestCode == 1) {
             val granted = grantResults.first() == PackageManager.PERMISSION_GRANTED
-            Toast.makeText(this,
-                "Notification permission is${ if (granted) "" else " not"} granted",
+            Toast.makeText(
+                this,
+                "Notification permission is${if (granted) " " else " not "}granted",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -68,13 +70,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     @SuppressLint("BatteryLife")
-    private fun checkAndRequestIgnoreBatteryOptimization(){
+    private fun checkAndRequestIgnoreBatteryOptimization() {
         val packageName: String = packageName
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
 
         // Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-        if (!pm.isIgnoringBatteryOptimizations(packageName)){
-            Toast.makeText(this,
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            Toast.makeText(
+                this,
                 "Ignore battery optimization will help service keep-alive, please allow it",
                 Toast.LENGTH_LONG
             ).show()
@@ -86,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun firstRunResourceExtraction(){
+    private fun firstRunResourceExtraction() {
         Thread {
             val firstRun = FirstRun(this)
             if (!firstRun.firstRun) return@Thread
@@ -97,10 +100,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun checkAndRequestPermission(){
-        val should = shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
-        if (should){
-            Toast.makeText(this, "Missing notification permission, requesting..", Toast.LENGTH_SHORT).show()
+    private fun checkAndRequestPermission() {
+        val should =
+            shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
+        if (should) {
+            Toast.makeText(
+                this,
+                "Missing notification permission, requesting..",
+                Toast.LENGTH_SHORT
+            ).show()
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
     }

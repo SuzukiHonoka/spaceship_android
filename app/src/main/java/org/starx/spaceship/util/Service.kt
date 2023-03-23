@@ -5,8 +5,7 @@ import android.content.Context
 
 
 class ServiceUtil {
-    companion object
-    {
+    companion object {
         @Suppress("DEPRECATION")
         fun isMyServiceRunning(ctx: Context, serviceClass: Class<*>): Boolean {
             val manager = ctx.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager

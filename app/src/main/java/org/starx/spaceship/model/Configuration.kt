@@ -1,8 +1,11 @@
 package org.starx.spaceship.model
 
+import kotlinx.serialization.SerialName
+
 @kotlinx.serialization.Serializable
-data class Configuration (
-    val server_addr: String,
+data class Configuration(
+    @SerialName("server_addr")
+    val serverAddress: String,
     val host: String,
     val path: String, // serviceName
     val tls: Boolean,
@@ -15,6 +18,6 @@ data class Configuration (
     val ipv6: Boolean,
     val cas: List<String>? = null,
     val route: List<Route>? = null,
-){
-    val role="client"
+) {
+    val role = "client"
 }

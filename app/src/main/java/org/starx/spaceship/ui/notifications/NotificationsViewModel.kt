@@ -8,12 +8,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class NotificationsViewModel : ViewModel() {
-    private val _logs = MutableLiveData<String>().apply{
+    private val _logs = MutableLiveData<String>().apply {
         value = ""
     }
     val logs = _logs
 
-    fun addLogs(line: String){
+    fun addLogs(line: String) {
         _logs.value += "$line\n"
     }
 
@@ -26,7 +26,8 @@ class NotificationsViewModel : ViewModel() {
         }
             .inputStream
             .bufferedReader()
-            .useLines { lines -> lines.forEach { line -> emit(line)  }
+            .useLines { lines ->
+                lines.forEach { line -> emit(line) }
             }
     }
 }

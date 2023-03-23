@@ -4,7 +4,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 
 class JsonFactory {
-    companion object{
+    companion object {
         @OptIn(ExperimentalSerializationApi::class)
         val processor = Json {
             encodeDefaults = true

@@ -31,28 +31,28 @@
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
+            app:defaultValue="Proxy"
             app:key="@string/server_service_name_key"
             app:title="Service Name"
-            app:defaultValue="Proxy"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
+            app:defaultValue="8"
             app:key="@string/server_mux_key"
             app:title="Mux"
-            app:defaultValue="8"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
-            app:key="@string/server_buffer_key"
-            app:title="Buffer"
-            app:summary="Buffer size used in transfer, in KB"
             app:defaultValue="32"
+            app:key="@string/server_buffer_key"
+            app:summary="Buffer size used in transfer, in KB"
+            app:title="Buffer"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
+            app:defaultValue="119.29.29.29"
             app:key="@string/dns_key"
             app:title="DNS"
-            app:defaultValue="119.29.29.29"
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
@@ -61,45 +61,44 @@
             app:title="Enable IPv6" />
 
         <SwitchPreferenceCompat
-            app:key="@string/server_tls_key"
             app:defaultValue="true"
+            app:key="@string/server_tls_key"
             app:title="Enable TLS" />
 
         <ListPreference
-            app:key="@string/server_bypass_key"
+            app:defaultValue="lan/cn"
             app:entries="@array/bypass_entries"
             app:entryValues="@array/bypass_values"
-            app:defaultValue="lan/cn"
+            app:key="@string/server_bypass_key"
             app:title="Built-in Bypass" />
 
         <SwitchPreferenceCompat
-            app:key="@string/server_advanced_route_toggle_key"
-            app:title="Advanced Route"
             app:defaultValue="false"
+            app:key="@string/server_advanced_route_toggle_key"
             app:summary="Traffics will be routed as you configured"
-            app:summaryOff="All unspecified traffics will go through the proxy"/>
+            app:summaryOff="All unspecified traffics will go through the proxy"
+            app:title="Advanced Route" />
 
         <Preference
             app:dependency="server_advanced_route_toggle"
             app:title="Configure Advanced Route" />
 
-        <Preference
-            app:title="Additional CA" />
+        <Preference app:title="Additional CA" />
 
     </PreferenceCategory>
 
     <PreferenceCategory app:title="Inbound Settings">
 
         <EditTextPreference
+            app:defaultValue="127.0.0.1:10818"
             app:key="@string/inbound_socks_key"
             app:title="Socks5"
-            app:defaultValue="127.0.0.1:10818"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
+            app:defaultValue="127.0.0.1:10828"
             app:key="@string/inbound_http_key"
             app:title="HTTP"
-            app:defaultValue="127.0.0.1:10828"
             app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
@@ -107,13 +106,13 @@
     <PreferenceCategory app:title="Service Settings">
 
         <SwitchPreferenceCompat
-            app:key="@string/service_autostart_key"
             app:defaultValue="false"
+            app:key="@string/service_autostart_key"
             app:title="Auto Start" />
 
         <SwitchPreferenceCompat
-            app:key="@string/service_restart_on_oom_key"
             app:defaultValue="false"
+            app:key="@string/service_restart_on_oom_key"
             app:title="Restart on OOM" />
 
     </PreferenceCategory>
