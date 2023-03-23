@@ -54,9 +54,7 @@ class Settings(private val ctx: Context) {
 
     var dns: String
         get() = sp.getString(ctx.getString(R.string.dns_key), "")!!
-        set(value) {
-            edit.putString(ctx.getString(R.string.dns_key), value).apply()
-        }
+        set(value) = edit.putString(ctx.getString(R.string.dns_key), value).apply()
 
     var enableIpv6: Boolean
         get() = sp.getBoolean(ctx.getString(R.string.enable_ipv6_key), false)
