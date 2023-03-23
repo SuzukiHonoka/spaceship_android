@@ -56,6 +56,11 @@
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="@string/enable_ipv6_key"
+            app:title="Enable IPv6" />
+
+        <SwitchPreferenceCompat
             app:key="@string/server_tls_key"
             app:defaultValue="true"
             app:title="Enable TLS" />

@@ -12,6 +12,7 @@ data class Configuration (
     val listen_socks: String,
     val listen_http: String,
     val dns: DNS,
+    val ipv6: Boolean,
     val cas: List<String>? = null,
     val route: List<Route>? = null,
 ){

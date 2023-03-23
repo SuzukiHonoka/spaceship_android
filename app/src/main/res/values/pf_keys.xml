@@ -9,6 +9,7 @@
     <string name="server_mux_key">server_mux</string>
     <string name="server_buffer_key">server_buffer</string>
     <string name="dns_key">dns</string>
+    <string name="enable_ipv6_key">enable_ipv6</string>
     <string name="server_tls_key">server_tls</string>
     <string name="server_bypass_key">server_bypass</string>
     <string name="server_advanced_route_toggle_key">server_advanced_route_toggle</string>

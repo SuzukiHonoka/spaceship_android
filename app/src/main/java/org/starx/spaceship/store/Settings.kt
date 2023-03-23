@@ -70,6 +70,10 @@ class Settings(private val ctx: Context) {
             edit.putString(ctx.getString(R.string.dns_key), value).apply()
         }
 
+    var enableIpv6: Boolean
+        get() = sp.getBoolean(ctx.getString(R.string.enable_ipv6_key), false)
+        set(value) = edit.putBoolean(ctx.getString(R.string.enable_ipv6_key), value).apply()
+
     var tls: Boolean
         get() = sp.getBoolean(ctx.getString(R.string.server_tls_key), true)
         set(value) {
