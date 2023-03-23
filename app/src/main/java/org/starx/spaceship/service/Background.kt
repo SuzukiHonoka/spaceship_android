@@ -45,8 +45,18 @@ class Background : Service() {
                 override fun onExit() {
                     if (running) {
                         stopSelf()
-                        Toast.makeText(applicationContext, "spaceship exited unexpectedly", Toast.LENGTH_SHORT).show()
+                        Handler(applicationContext.mainLooper).post {
+                            Toast.makeText(
+                                applicationContext,
+                                "spaceship exited ${if (failed) "with internal error" else "unexpectedly"}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
+                }
+
+                override fun onError() {
+                    failed = true
                 }
             })
             helper.start()

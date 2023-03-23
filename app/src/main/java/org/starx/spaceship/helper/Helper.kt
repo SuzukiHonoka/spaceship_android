@@ -10,7 +10,8 @@ class Helper(private val config: String, private var listener: IStatusListener? 
 
     private val launcher = spaceship_aar.Spaceship_aar.newLauncher()
     private val process = Thread {
-        launcher.launchFromString(config)
+        val ret = launcher.launchFromString(config)
+        if (!ret) listener?.onError()
         listener?.onExit()
     }
 
