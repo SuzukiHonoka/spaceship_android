@@ -15,9 +15,21 @@ enum class BuiltinRoute(val route: Route) {
             TransportType.TYPE_DIRECT.type,
         )
     ),
+    ROUTE_BYPASS_EXACT(
+        Route(
+            RouteType.TYPE_EXACT.type,
+            TransportType.TYPE_DIRECT.type,
+        )
+    ),
     ROUTE_BYPASS_CIDR(
         Route(
             RouteType.TYPE_CIDR.type,
+            TransportType.TYPE_DIRECT.type,
+        )
+    ),
+    ROUTE_BYPASS_REGEX(
+        Route(
+            RouteType.TYPE_REGEX.type,
             TransportType.TYPE_DIRECT.type,
         )
     ),
