@@ -12,8 +12,8 @@ android {
         applicationId "org.starx.spaceship"
         minSdk 29
         targetSdk 33
-        versionCode 123
-        versionName "1.2.3"
+        versionCode 124
+        versionName "1.2.4"
         archivesBaseName = "$applicationId-v$versionCode($versionName)"
     }
 
