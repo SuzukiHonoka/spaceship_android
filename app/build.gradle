@@ -12,16 +12,20 @@ android {
         applicationId "org.starx.spaceship"
         minSdk 29
         targetSdk 33
-        versionCode 122
-        versionName "1.2.2"
+        versionCode 123
+        versionName "1.2.3"
         archivesBaseName = "$applicationId-v$versionCode($versionName)"
     }
 
     buildTypes {
         release {
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+    packagingOptions {
+        exclude "DebugProbesKt.bin"
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -47,7 +51,7 @@ dependencies {
     implementation 'androidx.compose.material3:material3:1.0.1'
     implementation 'androidx.compose.material3:material3-window-size-class:1.0.1'
     implementation 'androidx.preference:preference:1.2.0'
-    implementation('io.ktor:ktor-serialization-kotlinx-json:2.2.4')
+    implementation('io.ktor:ktor-serialization-kotlinx-json:2.3.0')
     implementation files('libs/spaceship_aar.aar')
     implementation files('libs/spaceship_aar-sources.jar')
 }
