@@ -13,6 +13,7 @@ import org.starx.spaceship.databinding.FragmentHomeBinding
 import org.starx.spaceship.service.Background
 import org.starx.spaceship.store.Settings
 import org.starx.spaceship.util.ServiceUtil
+import spaceship_aar.Spaceship_aar
 
 
 class HomeFragment : Fragment() {
@@ -36,6 +37,15 @@ class HomeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        val card = binding.card
+        card.setOnLongClickListener {
+            Snackbar.make(
+                requireActivity().findViewById(android.R.id.content),
+                "spaceship core version: ${Spaceship_aar.getVersionCode()}",
+                Snackbar.LENGTH_SHORT
+            ).show()
+            true
+        }
         homeViewModel = ViewModelProvider(this)[HomeViewModel::class.java]
         val profile = binding.profile
         homeViewModel.profile.observe(viewLifecycleOwner) {
