@@ -9,9 +9,9 @@ data class Route(
 )
 
 enum class BuiltinRoute(val route: Route) {
-    ROUTE_BYPASS_DOMAINS(
+    ROUTE_BYPASS_DOMAIN(
         Route(
-            RouteType.TYPE_DOMAINS.type,
+            RouteType.TYPE_DOMAIN.type,
             TransportType.TYPE_DIRECT.type,
         )
     ),
