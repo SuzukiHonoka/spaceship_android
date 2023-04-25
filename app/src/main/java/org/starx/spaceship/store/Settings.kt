@@ -126,8 +126,10 @@ class Settings(private val ctx: Context) {
         if (!TextUtils.isEmpty(bypassOpt)) {
             if (bypassOpt.contains("lan")) routes.add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
             if (bypassOpt.contains("cn")) {
-                routes.add(BuiltinRoute.ROUTE_BYPASS_DOMAINS.route.apply {
-                    src = listOf("cn")
+                routes.add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.apply {
+                    src = listOf("\\S*\\.cn")
+                })
+                routes.add(BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.apply {
                     path = "${ctx.filesDir}/chinalist.txt"
                 })
                 routes.add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.apply {
