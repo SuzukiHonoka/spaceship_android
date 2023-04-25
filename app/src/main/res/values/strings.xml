@@ -8,12 +8,10 @@
     <string name="preference_settings_key">settings</string>
     <string name="root_preference_key">org.starx.spaceship_preferences</string>
     <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
     <string name="server_settings">Server Settings</string>
 
     <!-- Settings Preferences -->
     <string name="profile_name">Profile Name</string>
-    <string name="reply_title">Default reply action</string>
 
     <!-- Server Settings Preferences -->
     <string name="server">Server</string>
