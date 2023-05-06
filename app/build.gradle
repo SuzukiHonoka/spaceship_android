@@ -25,7 +25,9 @@ android {
         }
     }
     packagingOptions {
-        exclude "DebugProbesKt.bin"
+        resources {
+            excludes += ['DebugProbesKt.bin']
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
