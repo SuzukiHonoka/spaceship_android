@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.core.view.MenuProvider
 import androidx.navigation.NavController
 import androidx.navigation.findNavController
+import androidx.preference.EditTextPreference
 import androidx.preference.PreferenceFragmentCompat
 import org.starx.spaceship.R
 import org.starx.spaceship.model.Configuration
@@ -94,7 +95,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun applyConstrains() {
-        EditTextUtil(findPreference(getString(R.string.server_port_key))!!).setNumberOnly(1, 65535)
+        val portOnly = setOf<EditTextPreference>(
+            findPreference(getString(R.string.server_port_key))!!,
+            findPreference(getString(R.string.inbound_socks_port_key))!!,
+            findPreference(getString(R.string.inbound_http_port_key))!!,
+        )
+        portOnly.forEach {
+            EditTextUtil(it).setNumberOnly(1, 65535)
+        }
         EditTextUtil(findPreference(getString(R.string.server_mux_key))!!).setNumberOnly(0, 255)
         EditTextUtil(findPreference(getString(R.string.server_buffer_key))!!).setNumberOnly(
             1,
