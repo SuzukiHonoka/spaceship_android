@@ -27,93 +27,98 @@
 
         <EditTextPreference
             app:key="@string/server_name_indication_key"
-            app:title="Server Name Indication"
+            app:title="@string/server_name_indication"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="Proxy"
             app:key="@string/server_service_name_key"
-            app:title="Service Name"
+            app:title="@string/service_name"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="8"
             app:key="@string/server_mux_key"
-            app:title="Mux"
+            app:title="@string/mux"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="32"
             app:key="@string/server_buffer_key"
-            app:summary="Buffer size used in transfer, in KB"
-            app:title="Buffer"
+            app:summary="@string/buffer_size_used_in_transfer_in_kb"
+            app:title="@string/buffer"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="119.29.29.29"
             app:key="@string/dns_key"
-            app:title="DNS"
+            app:title="@string/dns"
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
             app:key="@string/enable_ipv6_key"
-            app:title="Enable IPv6" />
+            app:title="@string/enable_ipv6" />
 
         <SwitchPreferenceCompat
             app:defaultValue="true"
             app:key="@string/server_tls_key"
-            app:title="Enable TLS" />
+            app:title="@string/enable_tls" />
 
         <ListPreference
             app:defaultValue="lan/cn"
             app:entries="@array/bypass_entries"
             app:entryValues="@array/bypass_values"
             app:key="@string/server_bypass_key"
-            app:title="Built-in Bypass" />
+            app:title="@string/built_in_bypass" />
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
             app:key="@string/server_advanced_route_toggle_key"
-            app:summary="Traffics will be routed as you configured"
-            app:summaryOff="All unspecified traffics will go through the proxy"
-            app:title="Advanced Route" />
+            app:summary="@string/traffics_will_be_routed_as_you_configured"
+            app:summaryOff="@string/all_unspecified_traffics_will_go_through_the_proxy"
+            app:title="@string/advanced_route" />
 
         <Preference
-            app:dependency="server_advanced_route_toggle"
-            app:title="Configure Advanced Route" />
+            app:dependency="@string/server_advanced_route_toggle_key"
+            app:title="@string/configure_advanced_route" />
 
-        <Preference app:title="Additional CA" />
+        <Preference app:title="@string/additional_ca" />
 
     </PreferenceCategory>
 
-    <PreferenceCategory app:title="Inbound Settings">
+    <PreferenceCategory app:title="@string/inbound_settings">
 
         <EditTextPreference
             app:defaultValue="127.0.0.1:10818"
-            app:key="@string/inbound_socks_key"
-            app:title="Socks5"
+            app:key="@string/inbound_socks_port_key"
+            app:title="@string/socks5_port"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
             app:defaultValue="127.0.0.1:10828"
-            app:key="@string/inbound_http_key"
-            app:title="HTTP"
+            app:key="@string/inbound_http_port_key"
+            app:title="@string/http_port"
             app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="@string/inbound_allow_other_key"
+            app:title="@string/allow_other_devices" />
 
     </PreferenceCategory>
 
-    <PreferenceCategory app:title="Service Settings">
+    <PreferenceCategory app:title="@string/service_settings">
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
             app:key="@string/service_autostart_key"
-            app:title="Auto Start" />
+            app:title="@string/auto_start" />
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
             app:key="@string/service_restart_on_oom_key"
-            app:title="Restart on OOM" />
+            app:title="@string/restart_on_oom" />
 
     </PreferenceCategory>
 

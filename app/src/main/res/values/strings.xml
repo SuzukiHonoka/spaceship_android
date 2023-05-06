@@ -24,4 +24,25 @@
     <string name="none">N/A</string>
     <string name="exportConfig">Export</string>
     <string name="importConfig">Import</string>
+    <string name="server_name_indication">Server Name Indication</string>
+    <string name="service_name">Service Name</string>
+    <string name="mux">Mux</string>
+    <string name="buffer">Buffer</string>
+    <string name="buffer_size_used_in_transfer_in_kb">Buffer size used in transfer, in KB</string>
+    <string name="dns">DNS</string>
+    <string name="enable_ipv6">Enable IPv6</string>
+    <string name="enable_tls">Enable TLS</string>
+    <string name="built_in_bypass">Built-in Bypass</string>
+    <string name="advanced_route">Advanced Route</string>
+    <string name="traffics_will_be_routed_as_you_configured">Traffics will be routed as you configured</string>
+    <string name="all_unspecified_traffics_will_go_through_the_proxy">All unspecified traffics will go through the proxy</string>
+    <string name="configure_advanced_route">Configure Advanced Route</string>
+    <string name="additional_ca">Additional CA</string>
+    <string name="inbound_settings">Inbound Settings</string>
+    <string name="socks5_port">Socks5 Port</string>
+    <string name="http_port">HTTP Port</string>
+    <string name="allow_other_devices">Allow Other Devices</string>
+    <string name="service_settings">Service Settings</string>
+    <string name="restart_on_oom">Restart on OOM</string>
+    <string name="auto_start">Auto Start</string>
 </resources>
