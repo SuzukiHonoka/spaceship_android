@@ -9,6 +9,7 @@ import org.starx.spaceship.model.BuiltinRoute
 import org.starx.spaceship.model.Configuration
 import org.starx.spaceship.model.DNS
 import org.starx.spaceship.model.Route
+import org.starx.spaceship.util.Extractor
 import org.starx.spaceship.util.JsonFactory
 
 class Settings(private val ctx: Context) {
@@ -76,14 +77,19 @@ class Settings(private val ctx: Context) {
             ctx.getString(R.string.server_advanced_route_toggle_key),
             value
         ).apply()
+    var socksPort: Int
+        get() = sp.getString(ctx.getString(R.string.inbound_socks_port_key), "10818")!!.toInt()
+        set(value) = edit.putString(ctx.getString(R.string.inbound_socks_port_key), value.toString()).apply()
 
-    var socks: String
-        get() = sp.getString(ctx.getString(R.string.inbound_socks_key), "127.0.0.1:10818")!!
-        set(value) = edit.putString(ctx.getString(R.string.inbound_socks_key), value).apply()
+    var httpPort: Int
+        get() = sp.getString(ctx.getString(R.string.inbound_http_port_key), "10828")!!.toInt()
+        set(value) = edit.putString(ctx.getString(R.string.inbound_http_port_key), value.toString()).apply()
 
-    var http: String
-        get() = sp.getString(ctx.getString(R.string.inbound_http_key), "127.0.0.1:10828")!!
-        set(value) = edit.putString(ctx.getString(R.string.inbound_http_key), value).apply()
+    var allowOther: Boolean
+        get() = sp.getBoolean(ctx.getString(R.string.inbound_allow_other_key), false)
+        set(value) {
+            edit.putBoolean(ctx.getString(R.string.inbound_allow_other_key), value).apply()
+        }
 
     var autoStart: Boolean
         get() = sp.getBoolean(
@@ -113,8 +119,8 @@ class Settings(private val ctx: Context) {
         mux = cfg.mux
         buffer = cfg.buffer
         userID = cfg.uuid
-        socks = cfg.listen_socks
-        http = cfg.listen_http
+        socksPort = Extractor.extractPort(cfg.listen_socks)
+        httpPort = Extractor.extractPort(cfg.listen_http)
         dns = cfg.dns.server
         //ca = cfg.cas
         //routes = cfg.routes
@@ -138,6 +144,7 @@ class Settings(private val ctx: Context) {
             }
         }
         routes.add(BuiltinRoute.ROUTE_DEFAULT.route)
+        val bind = if (allowOther) "0.0.0.0" else "127.0.0.1"
         return Configuration(
             "${server}:${serverPort}",
             sni,
@@ -146,8 +153,8 @@ class Settings(private val ctx: Context) {
             mux,
             buffer,
             userID,
-            socks,
-            http,
+            "${bind}:${socksPort}",
+            "${bind}:${httpPort}",
             DNS(dns),
             enableIpv6,
             listOf("${ctx.filesDir.absolutePath}/fakeca.pem"),
