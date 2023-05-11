@@ -1,4 +1,4 @@
-package org.starx.spaceship.ui.notifications
+package org.starx.spaceship.ui.logs
 
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class NotificationsViewModel : ViewModel() {
+class LogsViewModel : ViewModel() {
     private val _logs = MutableLiveData<String>().apply {
         value = ""
     }

@@ -19,7 +19,7 @@
 
     <fragment
         android:id="@+id/navigation_notifications"
-        android:name="org.starx.spaceship.ui.notifications.NotificationsFragment"
+        android:name="org.starx.spaceship.ui.logs.LogsFragment"
         android:label="@string/title_logs"
         tools:layout="@layout/fragment_notifications" />
 </navigation>
