@@ -41,7 +41,8 @@ class LogsFragment : Fragment() {
             if (autoScrolling) logScroll.fullScroll(View.FOCUS_DOWN)
         }
         notificationsViewModel.logCatOutput().observe(viewLifecycleOwner) { line ->
-            if (line.contains("GoLog")) notificationsViewModel.addLogs(line)
+            val mark = "GoLog"
+            if (line.contains(mark)) notificationsViewModel.addLogs(line.substring(line.indexOf(mark)+2))
         }
         return root
     }
