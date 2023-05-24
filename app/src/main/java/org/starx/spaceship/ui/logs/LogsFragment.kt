@@ -1,17 +1,21 @@
 package org.starx.spaceship.ui.logs
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import org.starx.spaceship.databinding.FragmentNotificationsBinding
+import org.starx.spaceship.databinding.FragmentLogsBinding
 
 class LogsFragment : Fragment() {
 
-    private var _binding: FragmentNotificationsBinding? = null
+    companion object{
+        const val TAG = "LogsFragment"
+    }
+    private var _binding: FragmentLogsBinding? = null
     private lateinit var logsView: TextView
 
     // This property is only valid between onCreateView and
@@ -24,25 +28,23 @@ class LogsFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val notificationsViewModel =
+        val logsViewModel =
             ViewModelProvider(this)[LogsViewModel::class.java]
-        _binding = FragmentNotificationsBinding.inflate(inflater, container, false)
+        _binding = FragmentLogsBinding.inflate(inflater, container, false)
         val root: View = binding.root
         logsView = binding.logsText
         logsView.setOnClickListener {
             autoScrolling = false
-            //Toast.makeText(requireContext(), "ok", Toast.LENGTH_SHORT).show()
+            Log.i(TAG, "autoScrolling disabled")
         }
 
         val logScroll = binding.logsScroll
-
-        notificationsViewModel.logs.observe(viewLifecycleOwner) { logs ->
-            logsView.text = logs
+        logsViewModel.logCatOutput().observe(viewLifecycleOwner) { line ->
+            val mark = "GoLog   : "
+            if (!line.contains(mark)) return@observe
+            val log = line.substring(line.indexOf(mark)+mark.length)
+            logsView.append("${log}\n")
             if (autoScrolling) logScroll.fullScroll(View.FOCUS_DOWN)
-        }
-        notificationsViewModel.logCatOutput().observe(viewLifecycleOwner) { line ->
-            val mark = "GoLog"
-            if (line.contains(mark)) notificationsViewModel.addLogs(line.substring(line.indexOf(mark)+2))
         }
         return root
     }

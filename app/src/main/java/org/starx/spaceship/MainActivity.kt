@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
         // menu should be considered as top level destinations.
         val appBarConfiguration = AppBarConfiguration(
             setOf(
-                R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_notifications
+                R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_logs
             )
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
+        if (grantResults.isEmpty()) return
         if (requestCode == 1) {
             val granted = grantResults.first() == PackageManager.PERMISSION_GRANTED
             Toast.makeText(
@@ -75,18 +76,17 @@ class MainActivity : AppCompatActivity() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
 
         // Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            Toast.makeText(
-                this,
-                "Ignore battery optimization will help service keep-alive, please allow it",
-                Toast.LENGTH_LONG
-            ).show()
-            val intent = Intent().apply {
-                action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-                data = Uri.parse("package:$packageName")
-            }
-            startActivity(intent)
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        Toast.makeText(
+            this,
+            "Ignore battery optimization will help service keep-alive, please allow it",
+            Toast.LENGTH_LONG
+        ).show()
+        val intent = Intent().apply {
+            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+            data = Uri.parse("package:$packageName")
         }
+        startActivity(intent)
     }
 
     private fun firstRunResourceExtraction() {
@@ -101,15 +101,14 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
-        val should =
-            shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
-        if (should) {
-            Toast.makeText(
-                this,
-                "Missing notification permission, requesting..",
-                Toast.LENGTH_SHORT
-            ).show()
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
-        }
+        val ret = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+        val should = ret == PackageManager.PERMISSION_DENIED
+        if (!should) return
+        Toast.makeText(
+            this,
+            "Missing notification permission, requesting..",
+            Toast.LENGTH_SHORT
+        ).show()
+        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
     }
 }

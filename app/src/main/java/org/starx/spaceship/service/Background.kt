@@ -81,7 +81,7 @@ class Background : Service() {
         if (!notificationManager.areNotificationsEnabled()) {
             Toast.makeText(
                 this,
-                "Notifications not enabled, please allow it to run foreground service",
+                "Notifications not enabled, please allow it for running foreground service",
                 Toast.LENGTH_SHORT
             ).show()
         }
