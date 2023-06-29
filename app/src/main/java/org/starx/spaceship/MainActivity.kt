@@ -102,8 +102,7 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
         val ret = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-        val should = ret == PackageManager.PERMISSION_DENIED
-        if (!should) return
+        if (ret == PackageManager.PERMISSION_GRANTED) return
         Toast.makeText(
             this,
             "Missing notification permission, requesting..",
