@@ -12,6 +12,7 @@ class EditTextUtil(val et: EditTextPreference) {
         et.apply {
             setOnBindEditTextListener {
                 it.inputType = InputType.TYPE_CLASS_NUMBER
+                it.setSelection(it.text.length)
             }
             setOnPreferenceChangeListener { _, newValue ->
                 if (start == end) return@setOnPreferenceChangeListener true
@@ -44,6 +45,7 @@ class EditTextUtil(val et: EditTextPreference) {
             dialogLayoutResource = R.layout.widget_textfield
             setOnBindEditTextListener {
                 it.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                it.setSelection(it.text.length)
             }
         }
         setMask(char)
