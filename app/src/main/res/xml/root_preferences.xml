@@ -90,13 +90,13 @@
     <PreferenceCategory app:title="@string/inbound_settings">
 
         <EditTextPreference
-            app:defaultValue="127.0.0.1:10818"
+            app:defaultValue="10818"
             app:key="@string/inbound_socks_port_key"
             app:title="@string/socks5_port"
             app:useSimpleSummaryProvider="true" />
 
         <EditTextPreference
-            app:defaultValue="127.0.0.1:10828"
+            app:defaultValue="10828"
             app:key="@string/inbound_http_port_key"
             app:title="@string/http_port"
             app:useSimpleSummaryProvider="true" />
