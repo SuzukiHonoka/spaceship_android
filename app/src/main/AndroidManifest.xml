@@ -34,7 +34,9 @@
 
         <service
             android:name=".service.Background"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync"
+            android:exported="false"
+            />
 
         <receiver
             android:name=".receiver.OnBootComplete"
