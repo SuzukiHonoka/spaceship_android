@@ -29,6 +29,7 @@ class Background : Service() {
         const val TAG = "Service"
         const val CHANNEL_ID = "Spaceship"
         const val CHANNEL_NAME = "Background indicator"
+        const val NOTIFICATION_ID = 1
     }
 
     private val receiver = Receiver()
@@ -36,7 +37,7 @@ class Background : Service() {
     private var running = false
     private var failed = false
 
-    private lateinit var helper: Helper
+    private var helper: Helper? = null
 
     override fun onLowMemory() {
         Log.i(TAG, "onLowMemory")
@@ -51,8 +52,18 @@ class Background : Service() {
         if (running) return START_NOT_STICKY
         applyForeground()
         running = true
-        val s = intent.getStringExtra("config")!!
-        helper = Helper(s, object : IStatusListener {
+        val config = intent.getStringExtra("config")!!
+        helper = newHelper(config)
+        helper!!.start()
+        val status = Intent(Status.SERVICE_START.action)
+        status.`package` = applicationContext.packageName
+        sendBroadcast(status)
+        Toast.makeText(applicationContext, "Service started", Toast.LENGTH_SHORT).show()
+        return START_NOT_STICKY
+    }
+
+    private fun newHelper(config: String):Helper {
+        val helper = Helper(config, object : IStatusListener {
             override fun onExit() {
                 if (!running) return
                 stopSelf()
@@ -69,13 +80,10 @@ class Background : Service() {
                 failed = true
             }
         })
-        helper.start()
-        sendBroadcast(Intent(Status.SERVICE_START.action))
-        Toast.makeText(applicationContext, "Service started", Toast.LENGTH_SHORT).show()
-        return START_NOT_STICKY
+        return helper
     }
 
-    private fun applyForeground() {
+    private fun applyForeground(): Boolean {
         val serviceChannel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
@@ -90,7 +98,7 @@ class Background : Service() {
                 "Notifications not enabled, please allow it for running foreground service",
                 Toast.LENGTH_SHORT
             ).show()
-            return
+            return false
         }
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
@@ -110,15 +118,18 @@ class Background : Service() {
                 foregroundServiceBehavior = Notification.FOREGROUND_SERVICE_IMMEDIATE
             }
         }.build()
-        startForeground(1, notification)
+        startForeground(NOTIFICATION_ID, notification)
+        return true
     }
 
 
     override fun onDestroy() {
         running = false
-        helper.stop()
+        helper!!.stop()
         unregisterReceiver(receiver)
-        sendBroadcast(Intent(Status.SERVICE_STOP.action))
+        val intent = Intent(Status.SERVICE_STOP.action)
+        intent.`package` = applicationContext.packageName
+        sendBroadcast(intent)
         Toast.makeText(applicationContext, "Service stopped", Toast.LENGTH_SHORT).show()
     }
 
@@ -139,7 +150,9 @@ class Background : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             Log.i(TAG, "onReceive: ${intent.action}")
             if (intent.action != Message.ACQUIRE_SERVICE_STATUS.action) return
-            sendBroadcast(Intent(Status.SERVICE_OK.action))
+            val status = Intent(Status.SERVICE_OK.action)
+            status.`package` = applicationContext.packageName
+            sendBroadcast(status)
         }
     }
 }
