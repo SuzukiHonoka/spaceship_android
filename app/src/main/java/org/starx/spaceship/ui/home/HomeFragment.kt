@@ -78,7 +78,9 @@ class HomeFragment : Fragment() {
     private fun acquireServiceStatus() {
         Log.i(TAG, "acquireServiceStatus")
         // if service is alive, it will broadcast status back
-        requireContext().sendBroadcast(Intent(Message.ACQUIRE_SERVICE_STATUS.action))
+        val intent = Intent(Message.ACQUIRE_SERVICE_STATUS.action)
+        intent.`package` = requireContext().packageName
+        requireContext().sendBroadcast(intent)
     }
 
     private fun toggleSwitch(isChecked: Boolean) {
@@ -109,7 +111,7 @@ class HomeFragment : Fragment() {
             ).show()
             return
         }
-        homeViewModel.setProfile(settings.profileName)
+        setRunning()
         val configString = settings.toJson()
         val s = Intent(ctx, Background::class.java)
         s.putExtra("config", configString)
@@ -121,7 +123,7 @@ class HomeFragment : Fragment() {
     }
 
     private fun stopService() {
-        homeViewModel.setProfile("")
+        setNotRunning()
         val ctx = requireContext()
         val s = Intent(ctx, Background::class.java)
         ctx.stopService(s)
@@ -133,11 +135,12 @@ class HomeFragment : Fragment() {
 
     private fun registerReceiver(){
         val filter = IntentFilter()
-        filter.apply {
-            addAction(Status.SERVICE_OK.action)
-            addAction(Status.SERVICE_START.action)
-            addAction(Status.SERVICE_STOP.action)
-        }
+        val actions = setOf(
+            Status.SERVICE_OK.action,
+            Status.SERVICE_START.action,
+            Status.SERVICE_STOP.action
+        )
+        actions.forEach { action -> filter.addAction(action) }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requireContext().registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         }else {
@@ -145,18 +148,26 @@ class HomeFragment : Fragment() {
         }
     }
 
+    private fun setRunning(){
+        running = true
+        setSwitch(true)
+        homeViewModel.setProfile(Settings(requireContext()).profileName)
+    }
+
+    private fun setNotRunning(){
+        running = false
+        setSwitch(false)
+        homeViewModel.setProfile("")
+    }
+
     inner class Receiver: BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             Log.i(TAG, "onReceive: ${intent.action}")
-            if (intent.action == Status.SERVICE_START.action || intent.action == Status.SERVICE_OK.action) {
-                running = true
-                setSwitch(true)
-                homeViewModel.setProfile(Settings(requireContext()).profileName)
-                return
-            }else {
-                running = false
-                setSwitch(false)
-                homeViewModel.setProfile("")
+            when (intent.action)
+            {
+                Status.SERVICE_START.action -> setRunning()
+                Status.SERVICE_OK.action -> setRunning()
+                Status.SERVICE_STOP.action -> setNotRunning()
             }
         }
     }
