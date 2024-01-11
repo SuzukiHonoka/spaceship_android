@@ -104,8 +104,7 @@ class Settings(private val ctx: Context) {
             .apply()
 
     fun validate(): Boolean {
-        if (server == "" || serverPort == 0 || userID == "") return false
-        return true
+        return setOf(server, userID).all {  it != ""} && (serverPort in 0..65535)
     }
 
     fun saveConfiguration(cfg: Configuration) {
@@ -119,8 +118,8 @@ class Settings(private val ctx: Context) {
         mux = cfg.mux
         buffer = cfg.buffer
         userID = cfg.uuid
-        socksPort = Extractor.extractPort(cfg.listen_socks)
-        httpPort = Extractor.extractPort(cfg.listen_http)
+        socksPort = Extractor.extractPort(cfg.listenSocks)
+        httpPort = Extractor.extractPort(cfg.listenHttp)
         dns = cfg.dns.server
         //ca = cfg.cas
         //routes = cfg.routes

@@ -12,8 +12,10 @@ data class Configuration(
     val mux: Int, // 0~255
     val buffer: Int, // 1~65535
     val uuid: String,
-    val listen_socks: String,
-    val listen_http: String,
+    @SerialName("listen_socks")
+    val listenSocks: String,
+    @SerialName("listen_http")
+    val listenHttp: String,
     val dns: DNS,
     val ipv6: Boolean,
     val cas: List<String>? = null,
