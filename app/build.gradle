@@ -53,7 +53,7 @@ dependencies {
     implementation 'androidx.compose.material3:material3:1.1.2'
     implementation 'androidx.compose.material3:material3-window-size-class:1.1.2'
     implementation 'androidx.preference:preference-ktx:1.2.1'
-    implementation('io.ktor:ktor-serialization-kotlinx-json:2.3.7')
+    implementation('io.ktor:ktor-serialization-kotlinx-json:2.3.8')
     implementation files('libs/spaceship_aar.aar')
     implementation files('libs/spaceship_aar-sources.jar')
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
