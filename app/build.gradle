@@ -42,9 +42,9 @@ android {
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
@@ -53,7 +53,7 @@ dependencies {
     implementation 'androidx.compose.material3:material3:1.2.1'
     implementation 'androidx.compose.material3:material3-window-size-class:1.2.1'
     implementation 'androidx.preference:preference-ktx:1.2.1'
-    implementation('io.ktor:ktor-serialization-kotlinx-json:2.3.9')
+    implementation('io.ktor:ktor-serialization-kotlinx-json:2.3.10')
     implementation files('libs/spaceship_aar.aar')
     implementation files('libs/spaceship_aar-sources.jar')
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
