@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace 'org.starx.spaceship'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "org.starx.spaceship"
         minSdk 29
-        targetSdk 34
+        targetSdk 35
         versionCode 145
         versionName "1.4.5"
         archivesBaseName = "$applicationId-v$versionCode($versionName)"
