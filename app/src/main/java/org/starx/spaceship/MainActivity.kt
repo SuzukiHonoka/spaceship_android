@@ -101,13 +101,24 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
-        val ret = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-        if (ret == PackageManager.PERMISSION_GRANTED) return
-        Toast.makeText(
-            this,
-            "Missing notification permission, requesting..",
-            Toast.LENGTH_SHORT
-        ).show()
-        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
+        val permissions = mutableSetOf(
+            android.Manifest.permission.POST_NOTIFICATIONS
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            permissions.add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
+        }
+
+        permissions.forEach {
+            permission ->
+            val ret = checkSelfPermission(permission)
+            if (ret != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(
+                    this,
+                    "Missing permission: $permission, requesting..",
+                    Toast.LENGTH_SHORT
+                ).show()
+                requestPermissions(arrayOf(permission), 1)
+            }
+        }
     }
 }

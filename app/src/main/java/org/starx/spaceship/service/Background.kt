@@ -39,10 +39,6 @@ class Background : Service() {
 
     private var helper: Helper? = null
 
-    override fun onLowMemory() {
-        Log.i(TAG, "onLowMemory")
-    }
-
     override fun onCreate() {
         Log.i(TAG, "onCreate")
         registerReceiver()
@@ -50,9 +46,13 @@ class Background : Service() {
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         if (running) return START_NOT_STICKY
+        val config = intent.getStringExtra("config")
+        if (config == null) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         applyForeground()
         running = true
-        val config = intent.getStringExtra("config")!!
         helper = newHelper(config)
         helper!!.start()
         val status = Intent(Status.SERVICE_START.action)
@@ -125,7 +125,7 @@ class Background : Service() {
 
     override fun onDestroy() {
         running = false
-        helper!!.stop()
+        helper?.stop()
         unregisterReceiver(receiver)
         val intent = Intent(Status.SERVICE_STOP.action)
         intent.`package` = applicationContext.packageName
@@ -135,6 +135,11 @@ class Background : Service() {
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Toast.makeText(applicationContext, "Service max-run hour reached, shutting down..", Toast.LENGTH_SHORT).show()
+        stopSelf()
     }
 
     private fun registerReceiver(){
