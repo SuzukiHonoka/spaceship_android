@@ -5,101 +5,135 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
+import android.os.Binder
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.starx.spaceship.MainActivity
 import org.starx.spaceship.R
-import org.starx.spaceship.action.Message
-import org.starx.spaceship.action.Status
-import org.starx.spaceship.helper.Helper
-import org.starx.spaceship.helper.IStatusListener
+import java.util.concurrent.atomic.AtomicBoolean
 
 
 class Background : Service() {
+    private var serviceJob: Job? = null
+    private var serviceScope: CoroutineScope? = null
+    private val binder = LocalBinder()
+
+    private var isRunning = AtomicBoolean(false)
+    private var isFailed = AtomicBoolean(false)
+
+    private var launcher: spaceship_aar.LauncherWrapper? = null
+    private var launcherConfig: String? = null
+
     companion object {
         const val TAG = "Service"
         const val CHANNEL_ID = "Spaceship"
         const val CHANNEL_NAME = "Background indicator"
         const val NOTIFICATION_ID = 1
+        var isServiceRunning = false
+            private set
     }
 
-    private val receiver = Receiver()
-
-    private var running = false
-    private var failed = false
-
-    private var helper: Helper? = null
+    inner class LocalBinder : Binder() {
+        fun getService(): Background = this@Background
+    }
 
     override fun onCreate() {
+        super.onCreate()
         Log.i(TAG, "onCreate")
-        registerReceiver()
+        isServiceRunning = true
     }
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        if (running) return START_NOT_STICKY
-        val config = intent.getStringExtra("config")
-        if (config == null) {
+    private fun startSpaceship(startId: Int) {
+        if (launcherConfig.isNullOrEmpty()) return
+
+        serviceJob = Job()
+        serviceScope = CoroutineScope(Dispatchers.IO + serviceJob!!)
+
+        if (isRunning.compareAndSet(false, true)) {
+            serviceScope!!.launch {
+                Log.d(TAG, "Starting spaceship with config: $launcherConfig startId: $startId")
+                try {
+                    launcher = spaceship_aar.Spaceship_aar.newLauncher()
+                    val ret = launcher!!.launchFromString(launcherConfig)
+                    if (!ret) isFailed.set(true)
+                } catch (e: Exception) {
+                    isFailed.set(true)
+                    Log.e(TAG, "Start spaceship failed: ${e.message}")
+                }
+
+                // spaceship is stopped
+                isRunning.set(false)
+
+                // notify the user
+                val msg = "spaceship exited ${if (isFailed.get()) "with internal error" else "unexpectedly"}"
+                Log.d(TAG, msg)
+
+                // toast message on main thread
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
+                }
+
+                // stop service
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            }
+            return
+        }
+        Log.d(TAG, "spaceship is already started.")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        intent?.let {
+            val config = intent.getStringExtra("config")
+            launcherConfig = config
+        }
+
+        if (launcherConfig.isNullOrEmpty()) START_NOT_STICKY
+
+        if (!applyForeground()) {
             stopSelf()
             return START_NOT_STICKY
         }
-        applyForeground()
-        running = true
-        helper = newHelper(config)
-        helper!!.start()
-        val status = Intent(Status.SERVICE_START.action)
-        status.`package` = applicationContext.packageName
-        sendBroadcast(status)
+
+        if (isRunning.get()) {
+            Log.d(TAG,"Restarting spaceship")
+            stopSpaceshipAndWait()
+        }
+
+        startSpaceship(startId)
         Toast.makeText(applicationContext, "Service started", Toast.LENGTH_SHORT).show()
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
-    private fun newHelper(config: String):Helper {
-        val helper = Helper(config, object : IStatusListener {
-            override fun onExit() {
-                if (!running) return
-                stopSelf()
-                Handler(applicationContext.mainLooper).post {
-                    Toast.makeText(
-                        applicationContext,
-                        "spaceship exited ${if (failed) "with internal error" else "unexpectedly"}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-
-            override fun onError() {
-                failed = true
-            }
-        })
-        return helper
-    }
-
-    private fun applyForeground(): Boolean {
+    private fun createNotificationChannel(): Boolean {
         val serviceChannel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_DEFAULT
         )
-        val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(serviceChannel)
         if (!notificationManager.areNotificationsEnabled()) {
-            Toast.makeText(
-                this,
-                "Notifications not enabled, please allow it for running foreground service",
-                Toast.LENGTH_SHORT
-            ).show()
-            return false
+        Toast.makeText(
+            this,
+            "Notifications not enabled, please allow it for running foreground service",
+            Toast.LENGTH_SHORT
+        ).show()
+        return false
         }
+        return true
+    }
+
+    private fun buildNotification(): Notification {
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -117,47 +151,59 @@ class Background : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 foregroundServiceBehavior = Notification.FOREGROUND_SERVICE_IMMEDIATE
             }
-        }.build()
+        }
+        return notification.build()
+    }
+
+    private fun applyForeground(): Boolean {
+        if (!createNotificationChannel()) return false
+        val notification = buildNotification()
         startForeground(NOTIFICATION_ID, notification)
         return true
     }
 
+    private fun stopSpaceshipAndWait() {
+        stopSpaceship()
+        // wait isRunning to false
+        while (isRunning.get()) {
+            Log.d(TAG, "Waiting for spaceship to stop")
+            Thread.sleep(100)
+        }
+    }
+
+    private fun stopSpaceship() {
+        if (launcher != null) {
+            launcher!!.stop()
+        }
+        serviceJob?.cancel()
+    }
 
     override fun onDestroy() {
-        running = false
-        helper?.stop()
-        unregisterReceiver(receiver)
-        val intent = Intent(Status.SERVICE_STOP.action)
-        intent.`package` = applicationContext.packageName
-        sendBroadcast(intent)
+        super.onDestroy()
+        Log.d(TAG, "onDestroy")
+
+        isServiceRunning = false
+        stopSpaceship()
+
         Toast.makeText(applicationContext, "Service stopped", Toast.LENGTH_SHORT).show()
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
+    override fun onBind(intent: Intent?): IBinder {
+        Log.d(TAG, "onBind")
+        return binder
+    }
+
+    override fun onUnbind(intent: Intent?): Boolean {
+        Log.d(TAG, "onUnbind")
+        return super.onUnbind(intent)
+    }
+
+    fun isRunning(): Boolean {
+        return isServiceRunning && isRunning.get()
     }
 
     override fun onTimeout(startId: Int, fgsType: Int) {
         Toast.makeText(applicationContext, "Service max-run hour reached, shutting down..", Toast.LENGTH_SHORT).show()
         stopSelf()
-    }
-
-    private fun registerReceiver(){
-        val filter = IntentFilter(Message.ACQUIRE_SERVICE_STATUS.action)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        }else {
-            ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
-        }
-    }
-
-    inner class Receiver: BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            Log.i(TAG, "onReceive: ${intent.action}")
-            if (intent.action != Message.ACQUIRE_SERVICE_STATUS.action) return
-            val status = Intent(Status.SERVICE_OK.action)
-            status.`package` = applicationContext.packageName
-            sendBroadcast(status)
-        }
     }
 }

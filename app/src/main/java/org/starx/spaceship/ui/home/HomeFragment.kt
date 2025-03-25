@@ -1,22 +1,20 @@
 package org.starx.spaceship.ui.home
 
-import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
+import android.widget.CompoundButton
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
-import org.starx.spaceship.action.Message
-import org.starx.spaceship.action.Status
 import org.starx.spaceship.databinding.FragmentHomeBinding
 import org.starx.spaceship.service.Background
 import org.starx.spaceship.store.Settings
@@ -28,10 +26,25 @@ class HomeFragment : Fragment() {
         const val TAG = "Home"
     }
 
-    private val receiver = Receiver()
+    private var backgroundService: Background? = null
+    private var isServiceBound = false
 
-    private var running = false
-    private var ignoreState = false
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            Log.d(TAG, "Service Connected")
+            val binder = service as Background.LocalBinder
+            backgroundService = binder.getService()
+            isServiceBound = true
+            setRunning()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d(TAG, "Service Disconnected")
+            backgroundService = null
+            isServiceBound = false
+            setNotRunning()
+        }
+    }
 
     private var _binding: FragmentHomeBinding? = null
     private lateinit var homeViewModel: HomeViewModel
@@ -40,6 +53,13 @@ class HomeFragment : Fragment() {
     // This property is only valid between onCreateView and
     // onDestroyView.
     private val binding get() = _binding!!
+
+    // Listener to trigger when the user toggles the switch
+    private val checkedChangeListener =
+        CompoundButton.OnCheckedChangeListener { _, isChecked ->
+            toggleSwitch(isChecked)
+        }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -61,61 +81,74 @@ class HomeFragment : Fragment() {
             profile.text = it
         }
         serviceSwitch = binding.serviceSwitch
-        serviceSwitch.setOnCheckedChangeListener { _, isChecked ->
-            if (!ignoreState) toggleSwitch(isChecked)
-        }
-        registerReceiver()
-        acquireServiceStatus()
+        serviceSwitch.setOnCheckedChangeListener(null)
         return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        Log.d(TAG, "onViewCreated")
+        // Schedule the listener to be added after state restoration
+        serviceSwitch.post {
+            serviceSwitch.setOnCheckedChangeListener(checkedChangeListener)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        Log.d(TAG, "onStart")
+        if (Background.isServiceRunning && !isServiceBound) bindBackgroundService()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d(TAG, "onStop")
+        unbindBackgroundService()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
-        requireContext().unregisterReceiver(receiver)
-    }
-
-    private fun acquireServiceStatus() {
-        Log.i(TAG, "acquireServiceStatus")
-        // if service is alive, it will broadcast status back
-        val intent = Intent(Message.ACQUIRE_SERVICE_STATUS.action)
-        intent.`package` = requireContext().packageName
-        requireContext().sendBroadcast(intent)
     }
 
     private fun toggleSwitch(isChecked: Boolean) {
+        Log.d(TAG, "toggleSwitch: $isChecked")
         // start
         if (isChecked) {
-            if (!running) startService()
-        }else{
-            // close
-            stopService()
+            if (backgroundService == null || backgroundService?.isRunning() == false) startService()
+            return
         }
+
+        if (backgroundService != null && backgroundService!!.isRunning()) stopService()
     }
 
     private fun setSwitch(isChecked: Boolean) {
-        ignoreState = true
+        // Remove the listener, preventing the toggleSwitch callback
+        serviceSwitch.setOnCheckedChangeListener(null)
         serviceSwitch.isChecked = isChecked
-        ignoreState = false
+        // Re-add the listener to allow the user to toggle
+        serviceSwitch.setOnCheckedChangeListener(checkedChangeListener)
     }
 
     private fun startService() {
+        Log.i(TAG, "home: starting service")
         val ctx = requireContext()
         // get config
         val settings = Settings(ctx)
         if (!settings.validate()) {
-            setSwitch(false)
+            setNotRunning()
             Snackbar.make(
                 requireActivity().findViewById(android.R.id.content),
                 "Configuration not valid", Snackbar.LENGTH_SHORT
             ).show()
             return
         }
-        setRunning()
         val configString = settings.toJson()
         val s = Intent(ctx, Background::class.java)
         s.putExtra("config", configString)
         ctx.startForegroundService(s)
+
+        if (!isServiceBound) bindBackgroundService()
         Snackbar.make(
             requireActivity().findViewById(android.R.id.content),
             "Service started", Snackbar.LENGTH_LONG
@@ -123,9 +156,11 @@ class HomeFragment : Fragment() {
     }
 
     private fun stopService() {
+        Log.i(TAG, "home: stopping service")
         setNotRunning()
         val ctx = requireContext()
         val s = Intent(ctx, Background::class.java)
+        unbindBackgroundService()
         ctx.stopService(s)
         Snackbar.make(
             requireActivity().findViewById(android.R.id.content),
@@ -133,42 +168,26 @@ class HomeFragment : Fragment() {
         ).show()
     }
 
-    private fun registerReceiver(){
-        val filter = IntentFilter()
-        val actions = setOf(
-            Status.SERVICE_OK.action,
-            Status.SERVICE_START.action,
-            Status.SERVICE_STOP.action
-        )
-        actions.forEach { action -> filter.addAction(action) }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requireContext().registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        }else {
-            ContextCompat.registerReceiver(requireContext(), receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+    private fun unbindBackgroundService(){
+        if (isServiceBound) {
+            requireActivity().unbindService(serviceConnection)
+            isServiceBound = false
+            backgroundService = null
         }
     }
 
+    private fun  bindBackgroundService() {
+        val serviceIntent = Intent(requireContext(), Background::class.java)
+        requireContext().bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
     private fun setRunning(){
-        running = true
         setSwitch(true)
         homeViewModel.setProfile(Settings(requireContext()).profileName)
     }
 
     private fun setNotRunning(){
-        running = false
         setSwitch(false)
         homeViewModel.setProfile("")
-    }
-
-    inner class Receiver: BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            Log.i(TAG, "onReceive: ${intent.action}")
-            when (intent.action)
-            {
-                Status.SERVICE_START.action -> setRunning()
-                Status.SERVICE_OK.action -> setRunning()
-                Status.SERVICE_STOP.action -> setNotRunning()
-            }
-        }
     }
 }

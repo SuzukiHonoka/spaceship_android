@@ -101,6 +101,11 @@
             app:title="@string/http_port"
             app:useSimpleSummaryProvider="true" />
 
+        <EditTextPreference
+            app:key="@string/inbound_basic_auth_key"
+            app:title="@string/basic_auth"
+            app:useSimpleSummaryProvider="true" />
+
         <SwitchPreferenceCompat
             app:defaultValue="false"
             app:key="@string/inbound_allow_other_key"

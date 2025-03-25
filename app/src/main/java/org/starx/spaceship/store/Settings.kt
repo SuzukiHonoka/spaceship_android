@@ -3,7 +3,6 @@ package org.starx.spaceship.store
 import android.content.Context
 import android.content.SharedPreferences
 import android.text.TextUtils
-import kotlinx.serialization.encodeToString
 import org.starx.spaceship.R
 import org.starx.spaceship.model.BuiltinRoute
 import org.starx.spaceship.model.Configuration
@@ -77,6 +76,7 @@ class Settings(private val ctx: Context) {
             ctx.getString(R.string.server_advanced_route_toggle_key),
             value
         ).apply()
+
     var socksPort: Int
         get() = sp.getString(ctx.getString(R.string.inbound_socks_port_key), "10818")!!.toInt()
         set(value) = edit.putString(ctx.getString(R.string.inbound_socks_port_key), value.toString()).apply()
@@ -84,6 +84,10 @@ class Settings(private val ctx: Context) {
     var httpPort: Int
         get() = sp.getString(ctx.getString(R.string.inbound_http_port_key), "10828")!!.toInt()
         set(value) = edit.putString(ctx.getString(R.string.inbound_http_port_key), value.toString()).apply()
+
+    var basicAuth: String
+        get() = sp.getString(ctx.getString(R.string.inbound_basic_auth_key), "")!!
+        set(value) = edit.putString(ctx.getString(R.string.inbound_basic_auth_key), value).apply()
 
     var allowOther: Boolean
         get() = sp.getBoolean(ctx.getString(R.string.inbound_allow_other_key), false)
@@ -154,11 +158,21 @@ class Settings(private val ctx: Context) {
             userID,
             "${bind}:${socksPort}",
             "${bind}:${httpPort}",
+            if (basicAuth != "") splitBasicAuth(basicAuth) else null,
             DNS(dns),
             enableIpv6,
             listOf("${ctx.filesDir.absolutePath}/fakeca.pem"),
             routes
         )
+    }
+
+    private fun splitBasicAuth(s: String): List<String> {
+        val pattern = "[\n,]"
+        return s.split(Regex(pattern)).map {
+            it.trim()
+        }.filter {
+            it.isNotEmpty()
+        }
     }
 
     fun toJson() = JsonFactory.processor.encodeToString(toConfiguration())

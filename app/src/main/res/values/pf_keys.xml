@@ -15,6 +15,7 @@
     <string name="server_advanced_route_toggle_key">server_advanced_route_toggle</string>
     <string name="inbound_socks_port_key">inbound_socks_port</string>
     <string name="inbound_http_port_key">inbound_http_port</string>
+    <string name="inbound_basic_auth_key">inbound_basic_auth</string>
     <string name="inbound_allow_other_key">inbound_allow_other</string>
     <string name="service_autostart_key">service_autostart</string>
     <string name="service_restart_on_oom_key">service_restart_on_oom</string>

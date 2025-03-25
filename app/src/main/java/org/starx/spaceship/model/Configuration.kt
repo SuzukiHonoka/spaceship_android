@@ -16,6 +16,8 @@ data class Configuration(
     val listenSocks: String,
     @SerialName("listen_http")
     val listenHttp: String,
+    @SerialName("basic_auth")
+    val basicAuth: List<String>? = null,
     val dns: DNS,
     val ipv6: Boolean,
     val cas: List<String>? = null,

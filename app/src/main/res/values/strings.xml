@@ -41,6 +41,7 @@
     <string name="inbound_settings">Inbound Settings</string>
     <string name="socks5_port">Socks5 Port</string>
     <string name="http_port">HTTP Port</string>
+    <string name="basic_auth">Basic Auth</string>
     <string name="allow_other_devices">Allow Other Devices</string>
     <string name="service_settings">Service Settings</string>
     <string name="restart_on_oom">Restart on OOM</string>
