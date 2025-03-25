@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace 'org.starx.spaceship'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "org.starx.spaceship"
