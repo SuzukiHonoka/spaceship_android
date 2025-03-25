@@ -11,9 +11,9 @@ android {
     defaultConfig {
         applicationId "org.starx.spaceship"
         minSdk 29
-        targetSdk 35
-        versionCode 157
-        versionName "1.5.7"
+        targetSdk 36
+        versionCode 159
+        versionName "1.5.9"
         archivesBaseName = "$applicationId-v$versionCode($versionName)"
     }
 
