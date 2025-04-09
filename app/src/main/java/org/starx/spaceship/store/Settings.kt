@@ -125,6 +125,7 @@ class Settings(private val ctx: Context) {
         socksPort = Extractor.extractPort(cfg.listenSocks)
         httpPort = Extractor.extractPort(cfg.listenHttp)
         dns = cfg.dns.server
+        basicAuth = if (cfg.basicAuth == null) "" else cfg.basicAuth.joinToString(separator = "\n")
         //ca = cfg.cas
         //routes = cfg.routes
     }
@@ -168,10 +169,11 @@ class Settings(private val ctx: Context) {
 
     private fun splitBasicAuth(s: String): List<String> {
         val pattern = "[\n,]"
+        val authPattern = "^\\w+:\\w+\$".toRegex()
         return s.split(Regex(pattern)).map {
             it.trim()
         }.filter {
-            it.isNotEmpty()
+            it.isNotEmpty() && it.contains(authPattern)
         }
     }
 

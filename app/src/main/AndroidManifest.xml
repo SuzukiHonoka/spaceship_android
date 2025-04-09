@@ -19,7 +19,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Spaceship"
-        tools:targetApi="tiramisu">
+        tools:targetApi="36">
 
         <activity
             android:name=".MainActivity"
