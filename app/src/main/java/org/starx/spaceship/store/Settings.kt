@@ -7,14 +7,14 @@ import org.starx.spaceship.R
 import org.starx.spaceship.model.BuiltinRoute
 import org.starx.spaceship.model.Configuration
 import org.starx.spaceship.model.DNS
-import org.starx.spaceship.model.Route
 import org.starx.spaceship.util.Extractor
 import org.starx.spaceship.util.JsonFactory
+import org.starx.spaceship.util.Resource
 
 class Settings(private val ctx: Context) {
-    private var sp: SharedPreferences =
+    private val sp: SharedPreferences =
         ctx.getSharedPreferences(ctx.getString(R.string.root_preference_key), Context.MODE_PRIVATE)
-    private var edit: SharedPreferences.Editor = sp.edit()
+    private val edit: SharedPreferences.Editor = sp.edit()
 
     var profileName: String
         get() = sp.getString(ctx.getString(R.string.profile_name_key), "")!!
@@ -107,6 +107,10 @@ class Settings(private val ctx: Context) {
         set(value) = edit.putBoolean(ctx.getString(R.string.service_restart_on_oom_key), value)
             .apply()
 
+    var enableVPN: Boolean
+        get() = sp.getBoolean(ctx.getString(R.string.service_enable_vpn_key), false)
+        set(value) = edit.putBoolean(ctx.getString(R.string.service_enable_vpn_key), value).apply()
+
     fun validate(): Boolean {
         return setOf(server, userID).all {  it != ""} && (serverPort in 0..65535)
     }
@@ -132,22 +136,30 @@ class Settings(private val ctx: Context) {
 
     private fun toConfiguration(): Configuration {
         val bypassOpt = bypass
-        val routes = mutableListOf<Route>()
-        if (!TextUtils.isEmpty(bypassOpt)) {
-            if (bypassOpt.contains("lan")) routes.add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
-            if (bypassOpt.contains("cn")) {
-                routes.add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.apply {
-                    src = listOf("\\S*\\.cn")
-                })
-                routes.add(BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.apply {
-                    path = "${ctx.filesDir}/chinalist.txt"
-                })
-                routes.add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.apply {
-                    path = "${ctx.filesDir}/cn.zone"
-                })
+        val routes = buildList {
+            if (!TextUtils.isEmpty(bypassOpt)) {
+                if (bypassOpt.contains("lan")) add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
+                if (bypassOpt.contains("cn")) {
+                    add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.apply {
+                        src = listOf("\\S*\\.cn")
+                    })
+                    add(BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.apply {
+                        path = "${ctx.filesDir}/${Resource.OPT_ASSET_CHINALIST}"
+                    })
+                    add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.apply {
+                        path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4}"
+                    })
+                    if (enableIpv6) {
+                        add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.apply {
+                            path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6}"
+                        })
+                    }
+                }
             }
+            add(BuiltinRoute.ROUTE_DEFAULT.route)
         }
-        routes.add(BuiltinRoute.ROUTE_DEFAULT.route)
+
+
         val bind = if (allowOther) "0.0.0.0" else "127.0.0.1"
         return Configuration(
             "${server}:${serverPort}",
@@ -162,7 +174,7 @@ class Settings(private val ctx: Context) {
             if (basicAuth != "") splitBasicAuth(basicAuth) else null,
             DNS(dns),
             enableIpv6,
-            listOf("${ctx.filesDir.absolutePath}/fakeca.pem"),
+            listOf("${ctx.filesDir}/${Resource.OPT_ASSET_FAKECA}"),
             routes
         )
     }

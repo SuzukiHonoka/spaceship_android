@@ -117,6 +117,11 @@
 
         <SwitchPreferenceCompat
             app:defaultValue="false"
+            app:key="@string/service_enable_vpn_key"
+            app:title="@string/enable_vpn_service" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
             app:key="@string/service_autostart_key"
             app:title="@string/auto_start" />
 

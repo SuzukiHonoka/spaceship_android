@@ -1,9 +1,11 @@
 package org.starx.spaceship.ui.home
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.VpnService
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
@@ -11,12 +13,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CompoundButton
+import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.snackbar.Snackbar
 import org.starx.spaceship.databinding.FragmentHomeBinding
 import org.starx.spaceship.service.Background
+import org.starx.spaceship.service.VPN
 import org.starx.spaceship.store.Settings
 import spaceship_aar.Spaceship_aar
 
@@ -26,6 +32,7 @@ class HomeFragment : Fragment() {
         const val TAG = "Home"
     }
 
+    // Background service
     private var backgroundService: Background? = null
     private var isServiceBound = false
 
@@ -46,9 +53,30 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // VPN service
+    private var vpnService: VPN? = null
+    private var isVpnServiceBound = false
+
+    private val vpnServiceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            Log.d(TAG, "VPN Service Connected")
+            val binder = service as VPN.LocalBinder
+            vpnService = binder.getService()
+            isVpnServiceBound = true
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            Log.d(TAG, "VPN Service Disconnected")
+            vpnService = null
+            isVpnServiceBound = false
+        }
+    }
+
     private var _binding: FragmentHomeBinding? = null
     private lateinit var homeViewModel: HomeViewModel
     private lateinit var serviceSwitch: MaterialSwitch
+
+    private var vpnPrepareLauncher: ActivityResultLauncher<Intent>? = null
 
     // This property is only valid between onCreateView and
     // onDestroyView.
@@ -59,6 +87,22 @@ class HomeFragment : Fragment() {
         CompoundButton.OnCheckedChangeListener { _, isChecked ->
             toggleSwitch(isChecked)
         }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // construct result receiver
+        vpnPrepareLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val ctx = requireContext()
+            if (result.resultCode == Activity.RESULT_OK) {
+                // todo: wait for spaceship process actually start
+                starVpnService()
+                return@registerForActivityResult
+            }
+            stopService()
+            Toast.makeText(ctx, "VPN not prepared", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -98,12 +142,14 @@ class HomeFragment : Fragment() {
         super.onStart()
         Log.d(TAG, "onStart")
         if (Background.isServiceRunning && !isServiceBound) bindBackgroundService()
+        if (VPN.isServiceRunning && !isVpnServiceBound) bindVpnService()
     }
 
     override fun onStop() {
         super.onStop()
         Log.d(TAG, "onStop")
         unbindBackgroundService()
+        unbindVpnService()
     }
 
     override fun onDestroyView() {
@@ -132,7 +178,9 @@ class HomeFragment : Fragment() {
 
     private fun startService() {
         Log.i(TAG, "home: starting service")
+        serviceSwitch.isEnabled = false
         val ctx = requireContext()
+
         // get config
         val settings = Settings(ctx)
         if (!settings.validate()) {
@@ -143,29 +191,74 @@ class HomeFragment : Fragment() {
             ).show()
             return
         }
-        val configString = settings.toJson()
-        val s = Intent(ctx, Background::class.java)
-        s.putExtra("config", configString)
-        ctx.startForegroundService(s)
 
-        if (!isServiceBound) bindBackgroundService()
+        val configString = settings.toJson()
+        val backgroundIntent = Intent(ctx, Background::class.java)
+        backgroundIntent.putExtra("config", configString)
+        ctx.startForegroundService(backgroundIntent)
+        bindBackgroundService()
+
+        // check if we need to prepare vpn service
+        if (settings.enableVPN) {
+            val intent = VpnService.prepare(ctx)
+            // prepare if not prepared before
+            if (intent != null) vpnPrepareLauncher!!.launch(intent) else starVpnService()
+        }
+
         Snackbar.make(
             requireActivity().findViewById(android.R.id.content),
             "Service started", Snackbar.LENGTH_LONG
         ).show()
+
+        serviceSwitch.isEnabled = true
     }
 
     private fun stopService() {
         Log.i(TAG, "home: stopping service")
-        setNotRunning()
+        serviceSwitch.isEnabled = false
+
         val ctx = requireContext()
-        val s = Intent(ctx, Background::class.java)
-        unbindBackgroundService()
-        ctx.stopService(s)
+
+        // stop background service
+        //unbindBackgroundService()
+        val backgroundIntent = Intent(ctx, Background::class.java)
+        ctx.stopService(backgroundIntent)
+
+        // stop vpn service if any
+        if (isVpnServiceBound) {
+            stopVpnService()
+        }
+
+        // change status
+        setNotRunning()
+
+        // final prompt
+        serviceSwitch.isEnabled = true
         Snackbar.make(
             requireActivity().findViewById(android.R.id.content),
             "Service stopped", Snackbar.LENGTH_LONG
         ).show()
+    }
+
+    private fun starVpnService(){
+        Log.i(TAG, "home: starting vpn service")
+        val ctx = requireContext()
+        val vpnIntent = Intent(ctx, VPN::class.java).apply {
+            putExtra("port", Settings(ctx).socksPort)
+            putExtra("ipv6", Settings(ctx).enableIpv6)
+            putExtra("bypass", Settings(ctx).bypass)
+        }
+        ctx.startForegroundService(vpnIntent)
+        bindVpnService()
+    }
+
+    private fun stopVpnService(){
+        Log.i(TAG, "home: stopping vpn service")
+        //val ctx = requireContext()
+        //unbindVpnService()
+        //val vpnIntent = Intent(ctx, VPN::class.java)
+        //ctx.stopService(vpnIntent)
+        vpnService?.stopVpn()
     }
 
     private fun unbindBackgroundService(){
@@ -176,9 +269,22 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun  bindBackgroundService() {
+    private fun unbindVpnService(){
+        if (isVpnServiceBound) {
+            requireActivity().unbindService(vpnServiceConnection)
+            isVpnServiceBound = false
+            vpnService = null
+        }
+    }
+
+    private fun bindBackgroundService() {
         val serviceIntent = Intent(requireContext(), Background::class.java)
         requireContext().bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    private fun bindVpnService() {
+        val serviceIntent = Intent(requireContext(), VPN::class.java)
+        requireContext().bindService(serviceIntent, vpnServiceConnection, Context.BIND_AUTO_CREATE)
     }
 
     private fun setRunning(){

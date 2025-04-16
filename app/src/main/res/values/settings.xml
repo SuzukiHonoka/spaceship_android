@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="settings_first_run">first_run</string>
+    <string name="settings_resource_version">settings_resource_version</string>
 </resources>

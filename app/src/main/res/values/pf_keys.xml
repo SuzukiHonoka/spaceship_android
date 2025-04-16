@@ -19,4 +19,5 @@
     <string name="inbound_allow_other_key">inbound_allow_other</string>
     <string name="service_autostart_key">service_autostart</string>
     <string name="service_restart_on_oom_key">service_restart_on_oom</string>
+    <string name="service_enable_vpn_key">service_enable_vpn</string>
 </resources>

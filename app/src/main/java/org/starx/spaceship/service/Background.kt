@@ -1,25 +1,17 @@
 package org.starx.spaceship.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import android.widget.Toast
-import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.starx.spaceship.MainActivity
-import org.starx.spaceship.R
+import org.starx.spaceship.util.ServiceUtil
 import java.util.concurrent.atomic.AtomicBoolean
 
 
@@ -35,7 +27,7 @@ class Background : Service() {
     private var launcherConfig: String? = null
 
     companion object {
-        const val TAG = "Service"
+        const val TAG = "Background"
         const val CHANNEL_ID = "Spaceship"
         const val CHANNEL_NAME = "Background indicator"
         const val NOTIFICATION_ID = 1
@@ -50,6 +42,11 @@ class Background : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "onCreate")
+
+        // create notification channel
+        ServiceUtil.createNotificationChannel(this, CHANNEL_ID, CHANNEL_NAME)
+
+        // set service running status
         isServiceRunning = true
     }
 
@@ -92,17 +89,20 @@ class Background : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        intent?.let {
-            val config = intent.getStringExtra("config")
-            launcherConfig = config
+        Log.d(TAG, "onStartCommand")
+        if (intent == null) {
+            Log.d(TAG, "intent is null")
+            return START_NOT_STICKY
         }
+
+        val config = intent.getStringExtra("config")
+        launcherConfig = config
 
         if (launcherConfig.isNullOrEmpty()) START_NOT_STICKY
 
-        if (!applyForeground()) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
+        // start foreground service
+        val notification = ServiceUtil.buildNotification(this, CHANNEL_ID, "Service is running..")
+        startForeground(NOTIFICATION_ID, notification)
 
         if (isRunning.get()) {
             Log.d(TAG,"Restarting spaceship")
@@ -112,54 +112,6 @@ class Background : Service() {
         startSpaceship(startId)
         Toast.makeText(applicationContext, "Service started", Toast.LENGTH_SHORT).show()
         return START_STICKY
-    }
-
-    private fun createNotificationChannel(): Boolean {
-        val serviceChannel = NotificationChannel(
-            CHANNEL_ID,
-            CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(serviceChannel)
-        if (!notificationManager.areNotificationsEnabled()) {
-        Toast.makeText(
-            this,
-            "Notifications not enabled, please allow it for running foreground service",
-            Toast.LENGTH_SHORT
-        ).show()
-        return false
-        }
-        return true
-    }
-
-    private fun buildNotification(): Notification {
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            notificationIntent,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID).apply {
-            //setContentTitle("Spaceship")
-            setContentText("Service is running..")
-            setSmallIcon(R.drawable.cloud_sync)
-            setContentIntent(pendingIntent)
-            setOngoing(true)
-            //setSmallIcon(R.drawable.ic_launcher_nav)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                foregroundServiceBehavior = Notification.FOREGROUND_SERVICE_IMMEDIATE
-            }
-        }
-        return notification.build()
-    }
-
-    private fun applyForeground(): Boolean {
-        if (!createNotificationChannel()) return false
-        val notification = buildNotification()
-        startForeground(NOTIFICATION_ID, notification)
-        return true
     }
 
     private fun stopSpaceshipAndWait() {

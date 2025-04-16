@@ -19,8 +19,10 @@ import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import org.starx.spaceship.databinding.ActivityMainBinding
-import org.starx.spaceship.store.FirstRun
+import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.util.Resource
+import org.starx.spaceship.util.Resource.Companion.TAG
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,7 +47,11 @@ class MainActivity : AppCompatActivity() {
         )
         setupActionBarWithNavController(navController, appBarConfiguration)
         navView.setupWithNavController(navController)
+
+        // first run resource extraction
         firstRunResourceExtraction()
+
+        // permission check
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             checkAndRequestPermission()
         }
@@ -91,10 +97,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun firstRunResourceExtraction() {
         Thread {
-            val firstRun = FirstRun(this)
-            if (!firstRun.firstRun) return@Thread
-            Resource(this).extract()
-            firstRun.firstRun = false
+            // first run check
+            val runtime = Runtime(applicationContext)
+            if (runtime.firstRun) runtime.firstRun = false
+
+            // check version
+            val resVersion = runtime.resourceVersion
+            if (resVersion < Resource.VERSION) {
+                try {
+                    Resource(applicationContext).extract()
+                }
+                catch (e: IOException) {
+                    Log.e(TAG, "extract: $e")
+                    return@Thread
+                }
+
+                runtime.resourceVersion = Resource.VERSION
+                Log.i(TAG, "extract version: ${Resource.VERSION} done")
+            }
+
             Log.i("MainActivity", "onCreate: first-run resource extraction complete")
         }.start()
     }
