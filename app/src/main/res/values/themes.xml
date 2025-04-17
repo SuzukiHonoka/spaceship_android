@@ -1,6 +1,7 @@
 <resources>
     <!-- Base application theme. -->
     <style name="Theme.Spaceship" parent="Theme.Material3.DayNight">
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:forceDarkAllowed">false</item>
         <!-- Primary brand color. -->
         <item name="colorPrimary">@color/sakura_light</item>

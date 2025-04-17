@@ -16,7 +16,6 @@
     <!-- Server Settings Preferences -->
     <string name="server">Server</string>
     <string name="remote_port">Remote Port</string>
-
     <string name="user_id">User ID</string>
     <string name="uuid">UUID</string>
     <string name="spaceship_upper">SPACESHIP</string>
@@ -47,4 +46,5 @@
     <string name="restart_on_oom">Restart on OOM</string>
     <string name="auto_start">Auto Start</string>
     <string name="enable_vpn_service">Enable VPN Service</string>
+    <string name="logs">logs</string>
 </resources>

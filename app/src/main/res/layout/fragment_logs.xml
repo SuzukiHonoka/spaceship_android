@@ -4,13 +4,14 @@
     android:id="@+id/logs_scroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="5dp"
+    android:layout_margin="5dp"
     tools:context=".ui.logs.LogsFragment">
 
     <TextView
         android:id="@+id/logs_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:contentDescription="@string/logs"
         android:textIsSelectable="true"
         android:textSize="15sp" />
 
