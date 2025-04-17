@@ -96,28 +96,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun firstRunResourceExtraction() {
-        Thread {
-            // first run check
-            val runtime = Runtime(applicationContext)
-            if (runtime.firstRun) runtime.firstRun = false
+        // first run check
+        val runtime = Runtime(applicationContext)
+        if (runtime.firstRun) runtime.firstRun = false
 
-            // check version
-            val resVersion = runtime.resourceVersion
-            if (resVersion < Resource.VERSION) {
+        // check version
+        val resVersion = runtime.resourceVersion
+        if (resVersion < Resource.VERSION) {
+            Log.i(TAG, "current res version: $resVersion extract: ${Resource.VERSION}")
+            Thread {
+                // extract resource
                 try {
                     Resource(applicationContext).extract()
                 }
                 catch (e: IOException) {
-                    Log.e(TAG, "extract: $e")
+                    Log.e(TAG, "extract resource failed: $e")
                     return@Thread
                 }
 
                 runtime.resourceVersion = Resource.VERSION
                 Log.i(TAG, "extract version: ${Resource.VERSION} done")
-            }
+            }.start()
+            return
+        }
 
-            Log.i("MainActivity", "onCreate: first-run resource extraction complete")
-        }.start()
+        Log.i(TAG, "current res version: $resVersion")
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)

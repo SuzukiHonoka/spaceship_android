@@ -23,7 +23,9 @@ import com.google.android.material.snackbar.Snackbar
 import org.starx.spaceship.databinding.FragmentHomeBinding
 import org.starx.spaceship.service.Background
 import org.starx.spaceship.service.VPN
+import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.store.Settings
+import org.starx.spaceship.util.Resource
 import spaceship_aar.Spaceship_aar
 
 
@@ -159,6 +161,17 @@ class HomeFragment : Fragment() {
 
     private fun toggleSwitch(isChecked: Boolean) {
         Log.d(TAG, "toggleSwitch: $isChecked")
+
+        // check if resource is extracted
+        if (Runtime(requireContext()).resourceVersion < Resource.VERSION) {
+            if (isChecked) setSwitch(false)
+            Snackbar.make(
+                requireActivity().findViewById(android.R.id.content),
+                "Please wait for the resource extraction", Snackbar.LENGTH_SHORT
+            ).show()
+            return
+        }
+
         // start
         if (isChecked) {
             if (backgroundService == null || backgroundService?.isRunning() == false) startService()
@@ -220,7 +233,7 @@ class HomeFragment : Fragment() {
         val ctx = requireContext()
 
         // stop background service
-        //unbindBackgroundService()
+        unbindBackgroundService()
         val backgroundIntent = Intent(ctx, Background::class.java)
         ctx.stopService(backgroundIntent)
 
@@ -255,10 +268,10 @@ class HomeFragment : Fragment() {
     private fun stopVpnService(){
         Log.i(TAG, "home: stopping vpn service")
         //val ctx = requireContext()
-        //unbindVpnService()
         //val vpnIntent = Intent(ctx, VPN::class.java)
         //ctx.stopService(vpnIntent)
         vpnService?.stopVpn()
+        unbindVpnService()
     }
 
     private fun unbindBackgroundService(){

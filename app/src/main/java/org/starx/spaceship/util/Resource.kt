@@ -40,6 +40,6 @@ class Resource(private val ctx: Context) {
     }
 
     fun getFile(name: String): InputStream {
-        return ctx.assets.open(name)
+        return ctx.assets.open("$OPT_DIR/$name")
     }
 }

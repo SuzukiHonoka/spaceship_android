@@ -23,8 +23,8 @@ class VPN: VpnService() {
     private val binder = LocalBinder()
     private var isRunning = AtomicBoolean(false)
 
-    private val serviceJob = Job()
-    private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private var serviceJob: Job? = null
+    private var serviceScope: CoroutineScope? = null
 
     private var socksPort: Int? = null
     private var enableIpv6: Boolean? = null
@@ -108,7 +108,7 @@ class VPN: VpnService() {
         Log.d(TAG, "stopping")
         vpnInterface?.close()
         vpnInterface = null
-        serviceJob.cancel()
+        serviceJob?.cancel()
         //engine.Engine.stop()
     }
 
@@ -164,7 +164,7 @@ class VPN: VpnService() {
                     val ipAddress = parts[0]
                     val prefixLength = parts[1].toInt()
 
-                    var inetAddress: InetAddress? = null
+                    var inetAddress: InetAddress?
                     try {
                         inetAddress = InetAddress.getByName(ipAddress)
                     }catch (e: Exception) {
@@ -182,15 +182,18 @@ class VPN: VpnService() {
     }
 
     private fun startTun2socks() {
-        serviceScope.launch {
+        serviceJob = Job()
+        serviceScope = CoroutineScope(Dispatchers.IO + serviceJob!!)
+
+        serviceScope!!.launch {
             try {
                 val key = spaceship_aar.EngineKey()
                 key.mark = 0
                 key.mtu = 1500
-                key.device = "fd://" + vpnInterface!!.fd // <--- here
+                key.device = "fd://" + vpnInterface!!.fd
                 key.setInterface("")
                 key.logLevel = "error"
-                key.proxy = "socks5://127.0.0.1:$socksPort" // <--- and here
+                key.proxy = "socks5://127.0.0.1:$socksPort"
                 key.restAPI = ""
                 key.tcpSendBufferSize = ""
                 key.tcpReceiveBufferSize = ""
