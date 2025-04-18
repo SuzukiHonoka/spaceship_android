@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == 1) {
             val granted = grantResults.first() == PackageManager.PERMISSION_GRANTED
             Toast.makeText(
-                this,
+                applicationContext,
                 "Notification permission is${if (granted) " " else " not "}granted",
                 Toast.LENGTH_SHORT
             ).show()
@@ -84,8 +84,8 @@ class MainActivity : AppCompatActivity() {
         // Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
         if (pm.isIgnoringBatteryOptimizations(packageName)) return
         Toast.makeText(
-            this,
-            "Ignore battery optimization will help service keep-alive, please allow it",
+            applicationContext,
+            "Ignore battery optimization will help keeping service running, please allow it",
             Toast.LENGTH_LONG
         ).show()
         val intent = Intent().apply {
@@ -126,7 +126,8 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
         val permissions = mutableSetOf(
-            android.Manifest.permission.POST_NOTIFICATIONS
+            android.Manifest.permission.POST_NOTIFICATIONS,
+            android.Manifest.permission.QUERY_ALL_PACKAGES,
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             permissions.add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
@@ -137,7 +138,7 @@ class MainActivity : AppCompatActivity() {
             val ret = checkSelfPermission(permission)
             if (ret != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(
-                    this,
+                    applicationContext,
                     "Missing permission: $permission, requesting..",
                     Toast.LENGTH_SHORT
                 ).show()

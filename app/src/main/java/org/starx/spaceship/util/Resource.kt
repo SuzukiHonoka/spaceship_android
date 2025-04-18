@@ -16,6 +16,12 @@ class Resource(private val ctx: Context) {
         const val OPT_ASSET_CN_AGGREGATED_ZONE_V6 = "cn-aggregated-v6.zone"
         const val OPT_ASSET_CHINALIST = "chinalist.txt"
         const val OPT_ASSET_FAKECA = "fakeca.pem"
+
+        val LAN_CIDR = listOf(
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16"
+        )
     }
 
     fun extract() {

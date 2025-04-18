@@ -9,6 +9,7 @@ import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,6 +41,17 @@ class VPN: VpnService() {
         const val NOTIFICATION_ID = 1
         var isServiceRunning = false
             private set
+
+
+        // Tunnel specific settings
+
+        const val TUNNEL_ADDRESS_IPV4 = "172.16.0.2"
+        const val TUNNEL_ADDRESS_IPV6 = "fdbd:fb1f:7f90::2"
+
+        const val TUNNEL_DNS_IPV4_PRIMARY = "8.8.8.8"
+        const val TUNNEL_DNS_IPV4_SECONDARY = "8.8.4.4"
+        const val TUNNEL_DNS_IPV6_PRIMARY = "2001:4860:4860::8888"
+        const val TUNNEL_DNS_IPV6_SECONDARY = "2001:4860:4860::8844"
     }
 
     inner class LocalBinder : Binder() {
@@ -51,7 +63,7 @@ class VPN: VpnService() {
         Log.i(TAG, "onCreate")
 
         // create notification channel
-        ServiceUtil.createNotificationChannel(this, CHANNEL_ID, CHANNEL_NAME)
+        ServiceUtil.createNotificationChannel(applicationContext, CHANNEL_ID, CHANNEL_NAME)
 
         // set running status
         isServiceRunning = true
@@ -89,7 +101,7 @@ class VPN: VpnService() {
         bypassRule = intent.getStringExtra("bypass")
 
         // start foreground service
-        val notification = ServiceUtil.buildNotification(this, CHANNEL_ID, "VPN Service is running..")
+        val notification = ServiceUtil.buildNotification(applicationContext, CHANNEL_ID, "VPN Service is running..")
         startForeground(NOTIFICATION_ID, notification)
 
         try {
@@ -134,49 +146,81 @@ class VPN: VpnService() {
         stop()
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun parseCidrToIpPrefix(cidr: String): IpPrefix {
+        // parse cidr string like: 8.8.8.8/32 get the ip block and prefix, convert to IpPrefix object
+        val parts = cidr.split("/")
+        if (parts.size != 2) {
+            throw IllegalArgumentException("Invalid CIDR format: $cidr")
+        }
+        val ipAddress = parts[0]
+        val prefixLength = parts[1].toInt()
+        val inetAddress = InetAddress.getByName(ipAddress)
+        return IpPrefix(inetAddress, prefixLength)
+    }
+
     private fun buildTunnel() {
         val builder = Builder()
 
         val localTunnel = builder
-            .addAddress("172.16.0.2", 24)
+            .setMtu(1500)
+            .addAddress(TUNNEL_ADDRESS_IPV4, 24)
             .addRoute("0.0.0.0", 0)
-            .addDnsServer("8.8.8.8")
+            .addDnsServer(TUNNEL_DNS_IPV4_PRIMARY)
+            .addDnsServer(TUNNEL_DNS_IPV4_SECONDARY)
             .addDisallowedApplication(packageName)
 
-        if (enableIpv6 == true) localTunnel.addRoute("::", 0)
+        if (enableIpv6 == true) {
+            localTunnel.addDnsServer(TUNNEL_DNS_IPV6_PRIMARY)
+            localTunnel.addDnsServer(TUNNEL_DNS_IPV6_SECONDARY)
+            localTunnel.addAddress(TUNNEL_ADDRESS_IPV6, 64)
+            localTunnel.addRoute("::", 0)
+        }
 
-        if ( Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && bypassRule != null && bypassRule!!.contains("cn")) {
-            val fileList = mutableListOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4)
-            if (enableIpv6 == true) fileList += listOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6)
+        if ( Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !bypassRule.isNullOrEmpty()) {
+            val ipPrefixList: MutableList<IpPrefix> = mutableListOf()
 
-            fileList.forEach { filename ->
-                val ins = Resource(applicationContext).getFile(filename)
-                val reader = ins.bufferedReader()
-                val lines = reader.readLines()
-                Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
-                for (line in lines) {
-                    // parse cidr string like: 8.8.8.8/32 get the ip block and prefix, convert to IpPrefix object
-                    val parts = line.split("/")
-                    if (parts.size != 2) {
-                        continue
+            if (bypassRule!!.contains("cn")) {
+                val fileList = mutableListOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4)
+                if (enableIpv6 == true) fileList += listOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6)
+
+
+                fileList.forEach { filename ->
+                    val ins = Resource(applicationContext).getFile(filename)
+                    val reader = ins.bufferedReader()
+                    val lines = reader.readLines()
+                    Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
+                    for (line in lines) {
+                        try {
+                            val cidr = parseCidrToIpPrefix(line)
+                            ipPrefixList.add(cidr)
+                        }catch (e: Exception) {
+                            Log.e(TAG, "parse cidr failed: $e")
+                            continue
+                        }
                     }
-
-                    val ipAddress = parts[0]
-                    val prefixLength = parts[1].toInt()
-
-                    var inetAddress: InetAddress?
-                    try {
-                        inetAddress = InetAddress.getByName(ipAddress)
-                    }catch (e: Exception) {
-                        Log.e(TAG, "parse cidr failed: $e")
-                        continue
-                    }
-
-                    localTunnel.excludeRoute(IpPrefix(inetAddress, prefixLength))
+                    ins.close()
+                    reader.close()
                 }
-                ins.close()
-                reader.close()
             }
+
+            if (bypassRule!!.contains("lan")) {
+                Resource.LAN_CIDR.forEach { cidr ->
+                    try {
+                        val ipPrefix = parseCidrToIpPrefix(cidr)
+                        ipPrefixList.add(ipPrefix)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "parse cidr failed: $e")
+                    }
+                }
+            }
+
+            ipPrefixList.forEach { ipPrefix ->
+                localTunnel.excludeRoute(ipPrefix)
+            }
+
+            // preserve local-link
+            localTunnel.addRoute(TUNNEL_ADDRESS_IPV4, 24)
         }
         vpnInterface = localTunnel.establish()
     }
@@ -216,9 +260,5 @@ class VPN: VpnService() {
                 stopVpn()
             }
         }
-    }
-
-    fun isRunning(): Boolean {
-        return isServiceRunning && isRunning.get()
     }
 }

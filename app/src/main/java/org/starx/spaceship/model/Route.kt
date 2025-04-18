@@ -1,5 +1,7 @@
 package org.starx.spaceship.model
 
+import org.starx.spaceship.util.Resource
+
 @kotlinx.serialization.Serializable
 data class Route(
     val type: String,
@@ -37,11 +39,7 @@ enum class BuiltinRoute(val route: Route) {
         Route(
             RouteType.TYPE_CIDR.type,
             TransportType.TYPE_DIRECT.type,
-            listOf(
-                "10.0.0.0/8",
-                "172.16.0.0/12",
-                "192.168.0.0/16"
-            )
+            Resource.LAN_CIDR,
         )
     ),
     ROUTE_DEFAULT(

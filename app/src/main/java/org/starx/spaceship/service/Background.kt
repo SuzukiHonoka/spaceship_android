@@ -44,7 +44,7 @@ class Background : Service() {
         Log.i(TAG, "onCreate")
 
         // create notification channel
-        ServiceUtil.createNotificationChannel(this, CHANNEL_ID, CHANNEL_NAME)
+        ServiceUtil.createNotificationChannel(applicationContext, CHANNEL_ID, CHANNEL_NAME)
 
         // set service running status
         isServiceRunning = true
@@ -101,7 +101,7 @@ class Background : Service() {
         if (launcherConfig.isNullOrEmpty()) START_NOT_STICKY
 
         // start foreground service
-        val notification = ServiceUtil.buildNotification(this, CHANNEL_ID, "Service is running..")
+        val notification = ServiceUtil.buildNotification(applicationContext, CHANNEL_ID, "Service is running..")
         startForeground(NOTIFICATION_ID, notification)
 
         if (isRunning.get()) {
