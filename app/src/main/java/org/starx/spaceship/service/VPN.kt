@@ -45,6 +45,8 @@ class VPN: VpnService() {
 
         // Tunnel specific settings
 
+        const val TUNNEL_ADDRESS_IPV4_NETWORK = "172.16.0.0"
+        const val TUNNEL_ADDRESS_IPV4_NETWORK_PREFIX_LENGTH = 24
         const val TUNNEL_ADDRESS_IPV4 = "172.16.0.2"
         const val TUNNEL_ADDRESS_IPV6 = "fdbd:fb1f:7f90::2"
 
@@ -181,9 +183,9 @@ class VPN: VpnService() {
             val ipPrefixList: MutableList<IpPrefix> = mutableListOf()
 
             if (bypassRule!!.contains("cn")) {
+                Log.i(TAG, "adding bypass rule: cn")
                 val fileList = mutableListOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4)
                 if (enableIpv6 == true) fileList += listOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6)
-
 
                 fileList.forEach { filename ->
                     val ins = Resource(applicationContext).getFile(filename)
@@ -205,6 +207,7 @@ class VPN: VpnService() {
             }
 
             if (bypassRule!!.contains("lan")) {
+                Log.i(TAG, "adding bypass rule: lan")
                 Resource.LAN_CIDR.forEach { cidr ->
                     try {
                         val ipPrefix = parseCidrToIpPrefix(cidr)
@@ -215,13 +218,17 @@ class VPN: VpnService() {
                 }
             }
 
+            Log.i(TAG, "applying bypass rule count: ${ipPrefixList.size}")
             ipPrefixList.forEach { ipPrefix ->
                 localTunnel.excludeRoute(ipPrefix)
             }
 
             // preserve local-link
-            localTunnel.addRoute(TUNNEL_ADDRESS_IPV4, 24)
+            Log.i(TAG, "applying local-link")
+            localTunnel.addRoute(TUNNEL_ADDRESS_IPV4_NETWORK, TUNNEL_ADDRESS_IPV4_NETWORK_PREFIX_LENGTH)
         }
+
+        Log.i(TAG, "establishing tunnel")
         vpnInterface = localTunnel.establish()
     }
 
