@@ -61,8 +61,7 @@ class Background : Service() {
                 Log.d(TAG, "Starting spaceship with config: $launcherConfig startId: $startId")
                 try {
                     launcher = spaceship_aar.Spaceship_aar.newLauncher()
-                    val ret = launcher!!.launchFromString(launcherConfig)
-                    if (!ret) isFailed.set(true)
+                    launcher!!.launchFromString(launcherConfig)
                 } catch (e: Exception) {
                     isFailed.set(true)
                     Log.e(TAG, "Start spaceship failed: ${e.message}")
