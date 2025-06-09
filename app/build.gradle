@@ -5,44 +5,51 @@ plugins {
 }
 
 android {
-    namespace 'org.starx.spaceship'
-    compileSdk 36
+    namespace = 'org.starx.spaceship'
+    compileSdk = 36
 
     defaultConfig {
-        applicationId "org.starx.spaceship"
-        minSdk 29
-        targetSdk 36
-        versionCode 164
-        versionName "1.6.4"
-        archivesBaseName = "$applicationId-v$versionCode($versionName)"
+        applicationId = "org.starx.spaceship"
+        minSdk = 29
+        targetSdk = 36
+        versionCode = 165
+        versionName = "1.6.5"
         ndk {
             abiFilters.add("arm64-v8a")
+        }
+        base {
+            archivesName = "$applicationId-v$versionCode($versionName)"
         }
     }
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     packagingOptions {
         resources {
             excludes += ['DebugProbesKt.bin']
         }
     }
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = '17'
     }
+
     buildFeatures {
-        viewBinding true
+        viewBinding = true
     }
-    buildToolsVersion '36.0.0'
+
+    buildToolsVersion = '36.0.0'
 }
 
 dependencies {
