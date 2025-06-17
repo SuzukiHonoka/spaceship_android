@@ -19,11 +19,10 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <com.google.android.material.textview.MaterialTextView
-            style="@style/TextAppearance.Material3.TitleMedium"
+            style="@style/TextAppearance.Material3.HeadlineLarge"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:fontFamily="sans-serif"
             android:text="@string/spaceship_upper"
             android:textAlignment="center"
             android:textSize="50sp" />
@@ -31,11 +30,10 @@
 
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/text_connect"
-        style="@style/TextAppearance.Material3.BodyMedium"
+        style="@style/TextAppearance.Material3.ActionBar.Subtitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
-        android:fontFamily="sans-serif"
         android:text="@string/connect_upper"
         android:textSize="30sp"
         app:layout_constraintEnd_toEndOf="parent"
@@ -44,15 +42,15 @@
 
     <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/service_switch"
-        style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/text_connect" />
 
-    <TextView
+    <com.google.android.material.textview.MaterialTextView
         android:id="@+id/profile"
+        style="@style/TextAppearance.Material3.BodyLarge"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
@@ -61,5 +59,28 @@
         android:textSize="20sp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/service_switch" />
+        app:layout_constraintTop_toBottomOf="@id/service_switch" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/localIpCaption"
+        style="@style/TextAppearance.Material3.TitleMedium"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/local_ip"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/localIp"
+        style="@style/TextAppearance.Material3.BodyMedium"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/none"
+        android:textSize="20sp"
+        android:layout_marginStart="10dp"
+        app:layout_constraintStart_toEndOf="@id/localIpCaption"
+        app:layout_constraintTop_toTopOf="@id/localIpCaption" />
 </androidx.constraintlayout.widget.ConstraintLayout>

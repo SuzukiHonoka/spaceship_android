@@ -25,18 +25,22 @@ import org.starx.spaceship.service.Background
 import org.starx.spaceship.service.VPN
 import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.store.Settings
+import org.starx.spaceship.util.Connectivity
 import org.starx.spaceship.util.Resource
 import spaceship_aar.Spaceship_aar
 
 
 class HomeFragment : Fragment() {
-    companion object {
-        const val TAG = "Home"
-    }
+    // Connectivity Check
+    private var connectivity: Connectivity? = null
 
     // Background service
     private var backgroundService: Background? = null
     private var isServiceBound = false
+
+    companion object {
+        const val TAG = "Home"
+    }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -126,6 +130,14 @@ class HomeFragment : Fragment() {
         homeViewModel.profile.observe(viewLifecycleOwner) {
             profile.text = it
         }
+
+        // Observe local IP changes
+        homeViewModel.localIp.observe(viewLifecycleOwner) { ip ->
+            binding.localIpCaption.visibility = if (ip.isEmpty()) View.GONE else View.VISIBLE
+            binding.localIp.visibility = if (ip.isEmpty()) View.GONE else View.VISIBLE
+            binding.localIp.text = ip
+        }
+
         serviceSwitch = binding.serviceSwitch
         serviceSwitch.setOnCheckedChangeListener(null)
         return binding.root
@@ -143,7 +155,17 @@ class HomeFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         Log.d(TAG, "onStart")
-        if (Background.isServiceRunning && !isServiceBound) bindBackgroundService()
+
+        if (Background.isServiceRunning) {
+            if (!isServiceBound) bindBackgroundService()
+
+            // Restart connectivity discovery if needed
+            val settings = Settings(requireContext())
+            if (settings.allowOther) {
+                homeViewModel.startConnectivityDiscovery(requireContext())
+            }
+        }
+
         if (VPN.isServiceRunning && !isVpnServiceBound) bindVpnService()
     }
 
@@ -194,7 +216,7 @@ class HomeFragment : Fragment() {
         serviceSwitch.isEnabled = false
         val ctx = requireContext()
 
-        // get config
+        // get and validate config
         val settings = Settings(ctx)
         if (!settings.validate()) {
             setNotRunning()
@@ -204,6 +226,13 @@ class HomeFragment : Fragment() {
             ).show()
             return
         }
+
+        // check connectivity if needed
+        if (settings.allowOther) {
+            Log.d(TAG, "Starting connectivity discovery")
+            homeViewModel.startConnectivityDiscovery(ctx)
+        }
+
 
         val configString = settings.toJson()
         val backgroundIntent = Intent(ctx, Background::class.java)
@@ -229,6 +258,9 @@ class HomeFragment : Fragment() {
     private fun stopService() {
         Log.i(TAG, "home: stopping service")
         serviceSwitch.isEnabled = false
+
+        // stop connectivity if needed
+        homeViewModel.stopConnectivityDiscovery()
 
         val ctx = requireContext()
 

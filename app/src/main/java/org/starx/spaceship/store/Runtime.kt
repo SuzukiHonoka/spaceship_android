@@ -2,8 +2,8 @@ package org.starx.spaceship.store
 
 import android.content.Context
 import android.content.SharedPreferences
-import org.starx.spaceship.R
 import androidx.core.content.edit
+import org.starx.spaceship.R
 
 class Runtime(private val ctx: Context) {
 

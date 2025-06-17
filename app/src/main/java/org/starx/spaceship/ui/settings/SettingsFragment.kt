@@ -24,6 +24,10 @@ import org.starx.spaceship.util.EditTextUtil
 import org.starx.spaceship.util.JsonFactory
 
 class SettingsFragment : PreferenceFragmentCompat() {
+    companion object {
+        const val TAG = "SettingsFragment"
+    }
+
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.root_preferences, rootKey)
         applyConstrains()
@@ -65,12 +69,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
             Toast.makeText(ctx, "Copy configuration to clipboard first!", Toast.LENGTH_SHORT).show()
             return
         }
+
         val clip = clipboardManager.primaryClip!!.getItemAt(0).text.toString()
         try {
             val cfg = JsonFactory.processor.decodeFromString(Configuration.serializer(), clip)
             Settings(ctx).saveConfiguration(cfg)
         } catch (e: java.lang.Exception) {
-            Log.e("PARSE", "$clip\n$e")
+            Log.e(TAG, "clip: $clip error: $e")
             Toast.makeText(ctx, "parse configuration failed: $e", Toast.LENGTH_SHORT).show()
             return
         }

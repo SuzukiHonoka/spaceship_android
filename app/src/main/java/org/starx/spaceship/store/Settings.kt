@@ -181,7 +181,7 @@ class Settings(private val ctx: Context) {
 
     private fun splitBasicAuth(s: String): List<String> {
         val pattern = "[\n,]"
-        val authPattern = "^\\w+:\\w+\$".toRegex()
+        val authPattern = "^\\w+:\\w+$".toRegex()
         return s.split(Regex(pattern)).map {
             it.trim()
         }.filter {

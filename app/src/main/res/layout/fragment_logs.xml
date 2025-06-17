@@ -7,8 +7,9 @@
     android:layout_margin="5dp"
     tools:context=".ui.logs.LogsFragment">
 
-    <TextView
+    <com.google.android.material.textview.MaterialTextView
         android:id="@+id/logs_text"
+        style="@style/TextAppearance.Material3.BodyMedium"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:contentDescription="@string/logs"

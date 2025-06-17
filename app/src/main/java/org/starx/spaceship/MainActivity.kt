@@ -1,7 +1,6 @@
 package org.starx.spaceship
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -79,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("BatteryLife")
     private fun checkAndRequestIgnoreBatteryOptimization() {
         val packageName: String = packageName
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
 
         // Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
         if (pm.isIgnoringBatteryOptimizations(packageName)) return
