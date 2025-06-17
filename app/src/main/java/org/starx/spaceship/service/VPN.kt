@@ -165,6 +165,7 @@ class VPN: VpnService() {
         val builder = Builder()
 
         val localTunnel = builder
+            .setMetered(false)
             .setMtu(1500)
             .addAddress(TUNNEL_ADDRESS_IPV4, 24)
             .addRoute("0.0.0.0", 0)
