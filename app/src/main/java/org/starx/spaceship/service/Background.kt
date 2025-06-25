@@ -1,9 +1,11 @@
 package org.starx.spaceship.service
 
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
@@ -26,8 +28,11 @@ class Background : Service() {
     private var launcher: spaceship_aar.LauncherWrapper? = null
     private var launcherConfig: String? = null
 
+    private var wakeLock: PowerManager.WakeLock? = null
+
     companion object {
         const val TAG = "Background"
+        const val WAKELOCK_TAG = "Background::ProxyWakeLock"
         const val CHANNEL_ID = "Spaceship"
         const val CHANNEL_NAME = "Background indicator"
         const val NOTIFICATION_ID = 1
@@ -71,7 +76,8 @@ class Background : Service() {
                 isRunning.set(false)
 
                 // notify the user
-                val msg = "spaceship exited ${if (isFailed.get()) "with internal error" else "unexpectedly"}"
+                val msg = "spaceship exited ${if (isFailed.get()) "with internal error" else 
+                    if (serviceJob?.isActive == true) "unexpectedly" else "normally"}"
                 Log.d(TAG, msg)
 
                 // toast message on main thread
@@ -109,6 +115,7 @@ class Background : Service() {
         }
 
         startSpaceship(startId)
+        acquireWakeLock()
         Toast.makeText(applicationContext, "Service started", Toast.LENGTH_SHORT).show()
         return START_STICKY
     }
@@ -135,6 +142,7 @@ class Background : Service() {
 
         isServiceRunning = false
         stopSpaceship()
+        releaseWakeLock()
 
         Toast.makeText(applicationContext, "Service stopped", Toast.LENGTH_SHORT).show()
     }
@@ -156,5 +164,33 @@ class Background : Service() {
     override fun onTimeout(startId: Int, fgsType: Int) {
         Toast.makeText(applicationContext, "Service max-run hour reached, shutting down..", Toast.LENGTH_SHORT).show()
         stopSelf()
+    }
+
+    @SuppressLint("WakelockTimeout")
+    private fun acquireWakeLock() {
+        if (wakeLock != null) {
+            Log.d(TAG, "WakeLock already acquired: $wakeLock")
+            return
+        }
+
+        Log.d(TAG, "Acquiring WakeLock")
+        wakeLock =
+            (getSystemService(POWER_SERVICE) as PowerManager).run {
+                newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            }
+        Log.d(TAG, "WakeLock acquired: $wakeLock")
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Log.d(TAG, "WakeLock released: $it")
+            }
+        }
+        wakeLock = null
     }
 }

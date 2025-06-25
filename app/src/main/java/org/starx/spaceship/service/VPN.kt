@@ -1,5 +1,6 @@
 package org.starx.spaceship.service
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.net.IpPrefix
 import android.net.VpnService
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.starx.spaceship.MainActivity
 import org.starx.spaceship.util.Resource
 import org.starx.spaceship.util.ServiceUtil
 import java.net.InetAddress
@@ -106,46 +108,45 @@ class VPN: VpnService() {
         val notification = ServiceUtil.buildNotification(applicationContext, CHANNEL_ID, "VPN Service is running..")
         startForeground(NOTIFICATION_ID, notification)
 
-        try {
-            buildTunnel()
-        }catch (e: Exception) {
-            Log.e(TAG, "buildTunnel: $e")
-            Toast.makeText(applicationContext, "buildTunnel error: $e", Toast.LENGTH_SHORT).show()
-            return START_NOT_STICKY
-        }
-
         startTun2socks()
         return START_STICKY
     }
 
-    private fun stop(){
-        Log.d(TAG, "stopping")
+    private fun freeResource(){
+        Log.d(TAG, "freeing resources")
         vpnInterface?.close()
         vpnInterface = null
         serviceJob?.cancel()
         //engine.Engine.stop()
     }
 
-    fun stopVpn(){
+    fun stopVpn(related: Boolean = false) {
         // Stop VPN interface and engine
-        stop()
+        freeResource()
 
         // Remove the notification
         stopForeground(STOP_FOREGROUND_REMOVE)
         // Stop the service
         stopSelf()
+
+        if (related) {
+            // Also stop Background service direct by calling stopService
+            Log.d(TAG, "Stopping Background service as well")
+            val backgroundIntent = Intent(this, Background::class.java)
+            stopService(backgroundIntent)
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "onDestroy")
-        stop()
+        freeResource()
     }
 
     override fun onRevoke() {
         super.onRevoke()
         Log.d(TAG, "onRevoke")
-        stop()
+        freeResource()
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -162,9 +163,19 @@ class VPN: VpnService() {
     }
 
     private fun buildTunnel() {
+        Log.i(TAG, "buildTunnel")
         val builder = Builder()
 
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
         val localTunnel = builder
+            .setSession("Spaceship VPN")
+            .setConfigureIntent(pendingIntent)
             .setMetered(false)
             .setMtu(1500)
             .addAddress(TUNNEL_ADDRESS_IPV4, 24)
@@ -238,6 +249,15 @@ class VPN: VpnService() {
         serviceScope = CoroutineScope(Dispatchers.IO + serviceJob!!)
 
         serviceScope!!.launch {
+            try {
+                buildTunnel()
+            }catch (e: Exception) {
+                stopVpn(true)
+                Log.e(TAG, "buildTunnel: $e")
+                Toast.makeText(applicationContext, "buildTunnel error: $e", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
             try {
                 val key = spaceship_aar.EngineKey()
                 key.mark = 0

@@ -12,6 +12,8 @@ import org.starx.spaceship.databinding.FragmentLogsBinding
 
 class LogsFragment : Fragment() {
     private var _binding: FragmentLogsBinding? = null
+
+    private lateinit var logsViewModel: LogsViewModel
     private lateinit var logsView: TextView
 
     // This property is only valid between onCreateView and
@@ -21,6 +23,7 @@ class LogsFragment : Fragment() {
 
     companion object{
         const val TAG = "LogsFragment"
+        const val TAG_LOGS = "GoLog"
     }
 
     override fun onCreateView(
@@ -28,7 +31,7 @@ class LogsFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val logsViewModel =
+        logsViewModel =
             ViewModelProvider(this)[LogsViewModel::class.java]
         _binding = FragmentLogsBinding.inflate(inflater, container, false)
         val root: View = binding.root
@@ -50,8 +53,22 @@ class LogsFragment : Fragment() {
             }
         }
 
-        logsViewModel.startLogCollection("GoLog")
+        logsViewModel.startLogCollection(TAG_LOGS)
         return root
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Start log collection when fragment is visible
+        Log.i(TAG, "Starting log collection")
+        logsViewModel.startLogCollection(TAG_LOGS)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Stop log collection when fragment is not visible
+        Log.i(TAG, "Stopping log collection")
+        logsViewModel.stopLogCollection()
     }
 
     override fun onDestroyView() {

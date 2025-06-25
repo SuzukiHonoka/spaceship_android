@@ -1,8 +1,10 @@
 package org.starx.spaceship
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -54,7 +56,9 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             checkAndRequestPermission()
         }
+
         checkAndRequestIgnoreBatteryOptimization()
+        checkAndRequestUnrestrictedMobileDataUsage()
     }
 
     override fun onRequestPermissionsResult(
@@ -62,36 +66,46 @@ class MainActivity : AppCompatActivity() {
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
         if (grantResults.isEmpty()) return
         if (requestCode == 1) {
             val granted = grantResults.first() == PackageManager.PERMISSION_GRANTED
             Toast.makeText(
                 applicationContext,
-                "Notification permission is${if (granted) " " else " not "}granted",
+                "Notification permission is ${if (granted) "" else "not "}granted",
                 Toast.LENGTH_SHORT
             ).show()
         }
-
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     }
 
-    @SuppressLint("BatteryLife")
     private fun checkAndRequestIgnoreBatteryOptimization() {
         val packageName: String = packageName
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-
-        // Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
         if (pm.isIgnoringBatteryOptimizations(packageName)) return
-        Toast.makeText(
-            applicationContext,
-            "Ignore battery optimization will help keeping service running, please allow it",
-            Toast.LENGTH_LONG
-        ).show()
+
+        Log.i(TAG, "Battery optimization is enabled for $packageName, requesting to ignore it")
+        showActionDialog(
+            title = "Battery Optimization",
+            message = "This app requires ignoring battery optimization to function properly. Please allow it.",
+            onPositive = { openBatteryOptimizationSettings() }
+        )
+    }
+
+    @SuppressLint("BatteryLife")
+    private fun openBatteryOptimizationSettings() {
         val intent = Intent().apply {
             action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
             data = "package:$packageName".toUri()
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         startActivity(intent)
+
+        Toast.makeText(
+            applicationContext,
+            "Please allow ignoring battery optimization for this app in settings",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     private fun firstRunResourceExtraction() {
@@ -144,5 +158,67 @@ class MainActivity : AppCompatActivity() {
                 requestPermissions(arrayOf(permission), 1)
             }
         }
+    }
+
+    private fun isAppUnrestrictedOnMobileData(): Boolean {
+        val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+
+        // Check if app is restricted on mobile data
+        val restrictBackgroundStatus = connectivityManager.restrictBackgroundStatus
+
+        return when (restrictBackgroundStatus) {
+            ConnectivityManager.RESTRICT_BACKGROUND_STATUS_DISABLED -> {
+                // Data Saver is OFF - app can use background data
+                true
+            }
+            ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED -> {
+                // Data Saver is ON but app is whitelisted (unrestricted)
+                true
+            }
+            ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED -> {
+                // Data Saver is ON and app is restricted
+                false
+            }
+            else -> false
+        }
+    }
+
+    private fun checkAndRequestUnrestrictedMobileDataUsage() {
+        if (isAppUnrestrictedOnMobileData()) {
+            Log.i(TAG, "App is already unrestricted on mobile data")
+            return
+        }
+
+        showActionDialog(
+            title = "Unrestricted Mobile Data Usage",
+            message = "This app's background data usage is restricted. To ensure proper functionality, please allow unrestricted data access.",
+            onPositive = { openIgnoreBackgroundDataRestrictionsSettings() }
+        )
+    }
+
+    private fun openIgnoreBackgroundDataRestrictionsSettings() {
+        val intent = Intent().apply {
+            action = Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS
+            data = "package:$packageName".toUri()
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(intent)
+
+        Toast.makeText(
+            applicationContext,
+            "Please allow unrestricted mobile data usage for this app in settings",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun showActionDialog(title: String, message: String, onPositive: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("OK") { _, _ ->
+                onPositive()
+            }
+            .setNegativeButton("Not Now", null)
+            .show()
     }
 }
