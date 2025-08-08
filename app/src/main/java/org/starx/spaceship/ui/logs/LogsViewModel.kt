@@ -17,9 +17,7 @@ class LogsViewModel : ViewModel() {
     private val _logs = MutableLiveData<String>()
     val logs: LiveData<String> = _logs
 
-    private val logBuffer = StringBuilder()
     private var collectJob: Job? = null
-    private val scope = MainScope()
 
     companion object {
         const val TAG = "LogsViewModel"
@@ -29,8 +27,9 @@ class LogsViewModel : ViewModel() {
         // Don't start if already collecting
         if (collectJob?.isActive == true) return
 
-        collectJob = scope.launch {
+        collectJob = MainScope().launch {
             withContext(Dispatchers.IO) {
+                val logBuffer = StringBuilder()
                 try {
                     val command = if (tag != null) {
                         arrayOf("/system/bin/logcat", "-v", "raw", "-s", tag)
@@ -73,6 +72,7 @@ class LogsViewModel : ViewModel() {
     }
 
     fun stopLogCollection() {
+        _logs.value = ""
         collectJob?.cancel()
         collectJob = null
     }

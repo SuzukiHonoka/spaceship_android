@@ -55,6 +55,12 @@
             app:title="@string/dns"
             app:useSimpleSummaryProvider="true" />
 
+        <EditTextPreference
+            app:defaultValue="0"
+            app:key="@string/server_idle_timeout_key"
+            app:title="@string/idle_timeout"
+            app:useSimpleSummaryProvider="true" />
+
         <SwitchPreferenceCompat
             app:defaultValue="false"
             app:key="@string/enable_ipv6_key"

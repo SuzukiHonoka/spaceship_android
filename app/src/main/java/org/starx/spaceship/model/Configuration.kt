@@ -22,6 +22,8 @@ data class Configuration(
     val ipv6: Boolean,
     val cas: List<String>? = null,
     val route: List<Route>? = null,
+    @SerialName("idle_timeout")
+    val idleTimeout: Int?,
 ) {
     val role = "client"
 }

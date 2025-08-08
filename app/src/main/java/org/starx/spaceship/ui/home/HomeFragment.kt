@@ -25,15 +25,11 @@ import org.starx.spaceship.service.Background
 import org.starx.spaceship.service.VPN
 import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.store.Settings
-import org.starx.spaceship.util.Connectivity
 import org.starx.spaceship.util.Resource
 import spaceship_aar.Spaceship_aar
 
 
 class HomeFragment : Fragment() {
-    // Connectivity Check
-    private var connectivity: Connectivity? = null
-
     // Background service
     private var backgroundService: Background? = null
     private var isServiceBound = false

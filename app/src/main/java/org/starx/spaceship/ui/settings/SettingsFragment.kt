@@ -113,6 +113,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
             1,
             65535
         ).setSuffix("KB")
-        EditTextUtil(findPreference(getString(R.string.user_id_key))!!).setPasswordWithMask()
+        EditTextUtil(
+            findPreference(getString(R.string.user_id_key))!!
+        ).setPasswordWithMask()
+        EditTextUtil(
+            findPreference(getString(R.string.server_idle_timeout_key))!!
+        ).setNumberOnly().setSuffix("s")
     }
 }

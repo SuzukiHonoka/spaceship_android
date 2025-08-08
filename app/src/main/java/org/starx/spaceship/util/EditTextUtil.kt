@@ -8,7 +8,7 @@ import androidx.preference.Preference
 import org.starx.spaceship.R
 
 class EditTextUtil(val et: EditTextPreference) {
-    fun setNumberOnly(start: Int = 0, end: Int = 0): EditTextUtil {
+    fun setNumberOnly(start: Int = 0, end: Int = Int.MAX_VALUE): EditTextUtil {
         et.apply {
             setOnBindEditTextListener {
                 it.inputType = InputType.TYPE_CLASS_NUMBER
@@ -16,6 +16,7 @@ class EditTextUtil(val et: EditTextPreference) {
             }
             setOnPreferenceChangeListener { _, newValue ->
                 if (start == end) return@setOnPreferenceChangeListener true
+
                 val value: Int
                 try {
                     value = (newValue as String).toInt()
@@ -26,6 +27,7 @@ class EditTextUtil(val et: EditTextPreference) {
                     ).show()
                     return@setOnPreferenceChangeListener false
                 }
+
                 val isValid = (value in start..end)
                 if (!isValid) {
                     Toast.makeText(
@@ -58,11 +60,7 @@ class EditTextUtil(val et: EditTextPreference) {
             if (TextUtils.isEmpty(text)) {
                 "Not set"
             } else {
-                val sb = StringBuilder()
-                for (i: Int in 1..text!!.length) {
-                    sb.append(char)
-                }
-                sb
+                char.toString().repeat(text!!.length)
             }
         }
         return this

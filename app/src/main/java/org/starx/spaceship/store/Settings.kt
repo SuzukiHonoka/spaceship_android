@@ -111,6 +111,10 @@ class Settings(private val ctx: Context) {
         get() = sp.getBoolean(ctx.getString(R.string.service_enable_vpn_key), false)
         set(value) = edit.putBoolean(ctx.getString(R.string.service_enable_vpn_key), value).apply()
 
+    var idleTimeout: Int
+        get() = sp.getString(ctx.getString(R.string.server_idle_timeout_key), "0")!!.toInt()
+        set(value) = edit.putString(ctx.getString(R.string.server_idle_timeout_key), value.toString()).apply()
+
     fun validate(): Boolean {
         return setOf(server, userID).all {  it != ""} && (serverPort in 0..65535)
     }
@@ -130,6 +134,7 @@ class Settings(private val ctx: Context) {
         httpPort = Extractor.extractPort(cfg.listenHttp)
         dns = cfg.dns.server
         basicAuth = if (cfg.basicAuth == null) "" else cfg.basicAuth.joinToString(separator = "\n")
+        idleTimeout = cfg.idleTimeout ?: 0
         //ca = cfg.cas
         //routes = cfg.routes
     }
@@ -175,7 +180,8 @@ class Settings(private val ctx: Context) {
             DNS(dns),
             enableIpv6,
             listOf("${ctx.filesDir}/${Resource.OPT_ASSET_FAKECA}"),
-            routes
+            routes,
+            idleTimeout,
         )
     }
 
