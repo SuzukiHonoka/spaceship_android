@@ -270,6 +270,7 @@ class VPN: VpnService() {
                 key.tcpSendBufferSize = ""
                 key.tcpReceiveBufferSize = ""
                 key.tcpModerateReceiveBuffer = false
+                key.udpDisabled = true
                 Log.d(TAG, "Engine key: $key")
 
                 engine = spaceship_aar.Engine()
