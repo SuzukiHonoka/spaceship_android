@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.widget.Toast
-import org.starx.spaceship.service.Background
+import org.starx.spaceship.service.UnifiedVPNService
 import org.starx.spaceship.store.Settings
 
 class OnBootComplete : BroadcastReceiver() {
@@ -17,11 +17,18 @@ class OnBootComplete : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
         val settings = Settings(context)
         if (!settings.autoStart || !settings.validate()) return
+        
         val configString = settings.toJson()
-        val s = Intent(context, Background::class.java)
-        s.putExtra("config", configString)
-        context.startForegroundService(s)
-        Log.i(TAG, "onReceive: service started")
+        val serviceIntent = Intent(context, UnifiedVPNService::class.java).apply {
+            putExtra("config", configString)
+            putExtra("port", settings.socksPort)
+            putExtra("ipv6", settings.enableIpv6)
+            putExtra("bypass", settings.bypass)
+            putExtra("vpn_mode", settings.enableVPN)
+        }
+        
+        context.startForegroundService(serviceIntent)
+        Log.i(TAG, "onReceive: unified service started")
         Toast.makeText(context, "Auto start complete", Toast.LENGTH_SHORT).show()
     }
 }

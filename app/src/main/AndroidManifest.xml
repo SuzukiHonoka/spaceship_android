@@ -34,18 +34,12 @@
             </intent-filter>
         </activity>
 
-        <service android:name=".service.Background"
-            android:foregroundServiceType="specialUse"
-            android:exported="false">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="background service persistence and indication"/>
-        </service>
-
-        <service android:name=".service.VPN"
+        <service android:name=".service.UnifiedVPNService"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:foregroundServiceType="specialUse"
             android:exported="false">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="vpn" />
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="VPN and proxy service for secure network access"/>
             <intent-filter>
                 <action android:name="android.net.VpnService"/>
             </intent-filter>
