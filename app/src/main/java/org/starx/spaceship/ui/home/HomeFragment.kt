@@ -17,8 +17,8 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.snackbar.Snackbar
 import org.starx.spaceship.databinding.FragmentHomeBinding
 import org.starx.spaceship.service.UnifiedVPNService
 import org.starx.spaceship.store.Runtime
