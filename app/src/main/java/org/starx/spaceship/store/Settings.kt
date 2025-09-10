@@ -7,6 +7,7 @@ import org.starx.spaceship.R
 import org.starx.spaceship.model.BuiltinRoute
 import org.starx.spaceship.model.Configuration
 import org.starx.spaceship.model.DNS
+import org.starx.spaceship.service.UnifiedVPNService.Companion.TUNNEL_ADDRESS_IPV4_DNS
 import org.starx.spaceship.util.Extractor
 import org.starx.spaceship.util.JsonFactory
 import org.starx.spaceship.util.Resource
@@ -85,6 +86,10 @@ class Settings(private val ctx: Context) {
         get() = sp.getString(ctx.getString(R.string.inbound_http_port_key), "10828")!!.toInt()
         set(value) = edit.putString(ctx.getString(R.string.inbound_http_port_key), value.toString()).apply()
 
+    var enableRemoteDns: Boolean
+        get() = sp.getBoolean(ctx.getString(R.string.enable_remote_dns_key), true)
+        set(value) = edit.putBoolean(ctx.getString(R.string.enable_remote_dns_key), value).apply()
+
     var basicAuth: String
         get() = sp.getString(ctx.getString(R.string.inbound_basic_auth_key), "")!!
         set(value) = edit.putString(ctx.getString(R.string.inbound_basic_auth_key), value).apply()
@@ -135,6 +140,9 @@ class Settings(private val ctx: Context) {
         dns = cfg.dns.server
         basicAuth = if (cfg.basicAuth == null) "" else cfg.basicAuth.joinToString(separator = "\n")
         idleTimeout = cfg.idleTimeout ?: 0
+        enableIpv6 = cfg.ipv6
+        allowOther = !(cfg.listenSocks.contains("127.0.0.1") && cfg.listenHttp.contains("127.0.0.1"))
+        //enableRemoteDns = cfg.listenDns != ""
         //ca = cfg.cas
         //routes = cfg.routes
     }
@@ -176,6 +184,7 @@ class Settings(private val ctx: Context) {
             userID,
             "${bind}:${socksPort}",
             "${bind}:${httpPort}",
+            if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else "",
             if (basicAuth != "") splitBasicAuth(basicAuth) else null,
             DNS(dns),
             enableIpv6,

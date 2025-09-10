@@ -30,6 +30,7 @@
     <string name="buffer_size_used_in_transfer_in_kb">Buffer size used in transfer, in KB</string>
     <string name="dns">DNS</string>
     <string name="enable_ipv6">Enable IPv6</string>
+    <string name="enable_remote_dns">Enable Remote DNS</string>
     <string name="enable_tls">Enable TLS</string>
     <string name="built_in_bypass">Built-in Bypass</string>
     <string name="advanced_route">Advanced Route</string>

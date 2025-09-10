@@ -67,6 +67,11 @@
             app:title="@string/enable_ipv6" />
 
         <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="@string/enable_remote_dns_key"
+            app:title="@string/enable_remote_dns" />
+
+        <SwitchPreferenceCompat
             app:defaultValue="true"
             app:key="@string/server_tls_key"
             app:title="@string/enable_tls" />

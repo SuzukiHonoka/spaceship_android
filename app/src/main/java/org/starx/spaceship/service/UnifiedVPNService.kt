@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 import org.starx.spaceship.MainActivity
 import org.starx.spaceship.util.Resource
 import org.starx.spaceship.util.ServiceUtil
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * This eliminates the need for separate Background and VPN services, reducing resource usage
  * and avoiding Android's "noisy service" warnings.
  */
+@SuppressLint("VpnServicePolicy")
 class UnifiedVPNService : VpnService() {
     private val binder = LocalBinder()
     
@@ -47,6 +49,7 @@ class UnifiedVPNService : VpnService() {
     
     // Service configuration
     private var socksPort: Int = 10818
+    private var enableRemoteDns: Boolean = true
     private var enableIpv6: Boolean = false
     private var bypassRule: String? = null
     private var enableVpnMode: Boolean = false
@@ -75,6 +78,8 @@ class UnifiedVPNService : VpnService() {
         const val TUNNEL_DNS_IPV4_SECONDARY = "8.8.4.4"
         const val TUNNEL_DNS_IPV6_PRIMARY = "2001:4860:4860::8888"
         const val TUNNEL_DNS_IPV6_SECONDARY = "2001:4860:4860::8844"
+
+        const val TUNNEL_ADDRESS_IPV4_DNS = "127.0.0.1:58632"
     }
 
     inner class LocalBinder : Binder() {
@@ -106,6 +111,7 @@ class UnifiedVPNService : VpnService() {
         // Extract configuration from intent
         launcherConfig = intent.getStringExtra("config")
         socksPort = intent.getIntExtra("port", 10818)
+        enableRemoteDns = intent.getBooleanExtra("remote_dns", true)
         enableIpv6 = intent.getBooleanExtra("ipv6", false)
         bypassRule = intent.getStringExtra("bypass")
         enableVpnMode = intent.getBooleanExtra("vpn_mode", false)
@@ -229,13 +235,23 @@ class UnifiedVPNService : VpnService() {
             .setMtu(1500)
             .addAddress(TUNNEL_ADDRESS_IPV4, 24)
             .addRoute("0.0.0.0", 0)
-            .addDnsServer(TUNNEL_DNS_IPV4_PRIMARY)
-            .addDnsServer(TUNNEL_DNS_IPV4_SECONDARY)
             .addDisallowedApplication(packageName)
 
+        val dnsServerSet = mutableSetOf(TUNNEL_DNS_IPV4_PRIMARY, TUNNEL_DNS_IPV4_SECONDARY)
         if (enableIpv6) {
-            localTunnel.addDnsServer(TUNNEL_DNS_IPV6_PRIMARY)
-            localTunnel.addDnsServer(TUNNEL_DNS_IPV6_SECONDARY)
+            dnsServerSet.addAll(setOf(TUNNEL_DNS_IPV6_PRIMARY, TUNNEL_DNS_IPV6_SECONDARY))
+        }
+        dnsServerSet.forEach { it->
+            localTunnel.addDnsServer(it)
+        }
+
+        if (enableRemoteDns) {
+            dnsServerSet.forEach { it->
+                localTunnel.addRoute(it, if (InetAddress.getByName(it) is Inet4Address) 32 else 128)
+            }
+        }
+
+        if (enableIpv6) {
             localTunnel.addAddress(TUNNEL_ADDRESS_IPV6, 64)
             localTunnel.addRoute("::", 0)
         }
@@ -328,7 +344,8 @@ class UnifiedVPNService : VpnService() {
             key.tcpSendBufferSize = ""
             key.tcpReceiveBufferSize = ""
             key.tcpModerateReceiveBuffer = false
-            key.udpDisabled = true
+            key.udpDisabled = true // Disable UDP support by default
+            key.dnsAddr = if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else ""
             Log.d(TAG, "Engine key: $key")
 
             engine = spaceship_aar.Engine()
