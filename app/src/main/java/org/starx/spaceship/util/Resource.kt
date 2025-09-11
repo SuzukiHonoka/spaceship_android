@@ -26,12 +26,11 @@ class Resource(private val ctx: Context) {
 
     fun extract() {
         val assets = ctx.assets
-        val files = try {
-            assets.list(OPT_DIR)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to list assets in $OPT_DIR", e)
-            return
-        }
+        val files = runCatching { assets.list(OPT_DIR) }
+            .getOrElse { 
+                Log.e(TAG, "Failed to list assets in $OPT_DIR", it)
+                return
+            }
         
         if (files.isNullOrEmpty()) {
             Log.w(TAG, "No files found in $OPT_DIR directory")
@@ -43,7 +42,7 @@ class Resource(private val ctx: Context) {
         var errorCount = 0
         
         files.forEach { file ->
-            try {
+            runCatching {
                 val out = File(path, file)
                 if (out.exists()) {
                     Log.w(TAG, "File already exists, overwriting: ${out.absolutePath}")
@@ -51,20 +50,14 @@ class Resource(private val ctx: Context) {
                     Log.i(TAG, "Extracting: $file -> ${out.absolutePath}")
                 }
                 
-                var outStream: FileOutputStream? = null
-                var inStream: InputStream? = null
-                
-                try {
-                    outStream = FileOutputStream(out)
-                    inStream = assets.open("$OPT_DIR/$file")
-                    inStream.copyTo(outStream)
-                    extractedCount++
-                    Log.d(TAG, "Successfully extracted: $file")
-                } finally {
-                    inStream?.close()
-                    outStream?.close()
+                assets.open("$OPT_DIR/$file").use { inStream ->
+                    FileOutputStream(out).use { outStream ->
+                        inStream.copyTo(outStream)
+                    }
                 }
-            } catch (e: Exception) {
+                extractedCount++
+                Log.d(TAG, "Successfully extracted: $file")
+            }.onFailure { e ->
                 Log.e(TAG, "Failed to extract file: $file", e)
                 errorCount++
             }
@@ -77,11 +70,10 @@ class Resource(private val ctx: Context) {
     }
 
     fun getFile(name: String): InputStream {
-        return try {
+        return runCatching {
             ctx.assets.open("$OPT_DIR/$name")
-        } catch (e: Exception) {
+        }.onFailure { e ->
             Log.e(TAG, "Failed to open asset file: $name", e)
-            throw e
-        }
+        }.getOrThrow()
     }
 }

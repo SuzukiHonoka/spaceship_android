@@ -14,11 +14,14 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.starx.spaceship.databinding.ActivityMainBinding
 import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.util.Resource
@@ -117,20 +120,19 @@ class MainActivity : AppCompatActivity() {
         val resVersion = runtime.resourceVersion
         if (resVersion < Resource.VERSION) {
             Log.i(TAG, "current res version: $resVersion extract: ${Resource.VERSION}")
-            Thread {
-                // extract resource
+            
+            // Use lifecycle-aware coroutines for better resource management
+            lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     Resource(applicationContext).extract()
                     // Update version only after successful extraction
                     runtime.resourceVersion = Resource.VERSION
                     Log.i(TAG, "extract version: ${Resource.VERSION} done")
-                }
-                catch (e: IOException) {
+                } catch (e: IOException) {
                     Log.e(TAG, "extract resource failed: $e")
                     // Don't update version if extraction failed
-                    return@Thread
                 }
-            }.start()
+            }
             return
         }
 
@@ -139,18 +141,14 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
-        val permissions = mutableSetOf(
-            android.Manifest.permission.POST_NOTIFICATIONS,
-            android.Manifest.permission.QUERY_ALL_PACKAGES,
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            permissions.add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
-        }
-
-        permissions.forEach {
-            permission ->
-            val ret = checkSelfPermission(permission)
-            if (ret != PackageManager.PERMISSION_GRANTED) {
+        buildSet {
+            add(android.Manifest.permission.POST_NOTIFICATIONS)
+            add(android.Manifest.permission.QUERY_ALL_PACKAGES)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
+            }
+        }.forEach { permission ->
+            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(
                     applicationContext,
                     "Missing permission: $permission, requesting..",

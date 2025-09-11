@@ -2,7 +2,6 @@ package org.starx.spaceship.store
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.text.TextUtils
 import org.starx.spaceship.R
 import org.starx.spaceship.model.BuiltinRoute
 import org.starx.spaceship.model.Configuration
@@ -157,7 +156,7 @@ class Settings(private val ctx: Context) {
         socksPort = Extractor.extractPort(cfg.listenSocks)
         httpPort = Extractor.extractPort(cfg.listenHttp)
         dns = cfg.dns.server
-        basicAuth = if (cfg.basicAuth == null) "" else cfg.basicAuth.joinToString(separator = "\n")
+        basicAuth = cfg.basicAuth?.joinToString(separator = "\n") ?: ""
         idleTimeout = cfg.idleTimeout ?: 0
         enableIpv6 = cfg.ipv6
         allowOther = !(cfg.listenSocks.contains("127.0.0.1") && cfg.listenHttp.contains("127.0.0.1"))
@@ -169,7 +168,7 @@ class Settings(private val ctx: Context) {
     private fun toConfiguration(): Configuration {
         val bypassOpt = bypass
         val routes = buildList {
-            if (!TextUtils.isEmpty(bypassOpt)) {
+            if (bypassOpt.isNotBlank()) {
                 if (bypassOpt.contains("lan")) add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
                 if (bypassOpt.contains("cn")) {
                     add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.apply {
@@ -204,7 +203,7 @@ class Settings(private val ctx: Context) {
             "${bind}:${socksPort}",
             "${bind}:${httpPort}",
             if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else "",
-            if (basicAuth != "") splitBasicAuth(basicAuth) else null,
+            basicAuth.takeIf { it.isNotBlank() }?.let(::splitBasicAuth),
             DNS(dns),
             enableIpv6,
             listOf("${ctx.filesDir}/${Resource.OPT_ASSET_FAKECA}"),
@@ -214,13 +213,12 @@ class Settings(private val ctx: Context) {
     }
 
     private fun splitBasicAuth(s: String): List<String> {
-        val pattern = "[\n,]"
         val authPattern = "^\\w+:\\w+$".toRegex()
-        return s.split(Regex(pattern)).map {
-            it.trim()
-        }.filter {
-            it.isNotEmpty() && it.contains(authPattern)
-        }
+        return s.split(Regex("[\n,]"))
+            .asSequence()
+            .map(String::trim)
+            .filter { it.isNotEmpty() && authPattern.matches(it) }
+            .toList()
     }
 
     fun toJson() = JsonFactory.processor.encodeToString(toConfiguration())

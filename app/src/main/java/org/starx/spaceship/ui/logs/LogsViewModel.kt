@@ -4,9 +4,9 @@ import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,7 +33,7 @@ class LogsViewModel : ViewModel() {
             return
         }
 
-        collectJob = MainScope().launch {
+        collectJob = viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val logBuffer = StringBuilder()
                 var reader: BufferedReader? = null
