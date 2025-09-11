@@ -12,8 +12,8 @@ android {
         applicationId = "org.starx.spaceship"
         minSdk = 29
         targetSdk = 36
-        versionCode = 169
-        versionName = '1.6.9'
+        versionCode = 170
+        versionName = '1.7.0'
         ndk {
             abiFilters.add("arm64-v8a")
         }
