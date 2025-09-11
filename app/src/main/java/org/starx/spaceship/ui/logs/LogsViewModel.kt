@@ -39,11 +39,9 @@ class LogsViewModel : ViewModel() {
                 var reader: BufferedReader? = null
                 
                 try {
-                    val command = if (tag != null) {
-                        arrayOf("/system/bin/logcat", "-v", "time", "-s", tag)
-                    } else {
-                        arrayOf("/system/bin/logcat", "-v", "time")
-                    }
+                    val command = tag?.let {
+                        arrayOf("/system/bin/logcat", "-v", "time", "-s", it)
+                    } ?: arrayOf("/system/bin/logcat", "-v", "time")
 
                     logProcess = Runtime.getRuntime().exec(command)
                     reader = BufferedReader(InputStreamReader(logProcess!!.inputStream))
@@ -51,8 +49,8 @@ class LogsViewModel : ViewModel() {
                     var line: String?
                     while (isActive && logProcess?.isAlive == true) {
                         line = reader.readLine()
-                        if (line != null) {
-                            logBuffer.append(line).append("\n")
+                        line?.let {
+                            logBuffer.append(it).append("\n")
 
                             // Prevent buffer from growing too large
                             if (logBuffer.length > MAX_BUFFER_SIZE) {

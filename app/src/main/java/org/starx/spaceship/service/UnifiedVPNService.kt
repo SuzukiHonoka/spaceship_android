@@ -294,22 +294,21 @@ class UnifiedVPNService : VpnService() {
 
             fileList.forEach { filename ->
                 try {
-                    val ins = Resource(applicationContext).getFile(filename)
-                    val reader = ins.bufferedReader()
-                    val lines = reader.readLines()
-                    Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
-                    
-                    for (line in lines) {
-                        try {
-                            val cidr = parseCidrToIpPrefix(line)
-                            ipPrefixList.add(cidr)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "parse cidr failed: $e")
-                            continue
+                    Resource(applicationContext).getFile(filename).use { ins ->
+                        ins.bufferedReader().use { reader ->
+                            val lines = reader.readLines()
+                            Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
+                            
+                            lines.forEach { line ->
+                                try {
+                                    val cidr = parseCidrToIpPrefix(line)
+                                    ipPrefixList.add(cidr)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "parse cidr failed: $e")
+                                }
+                            }
                         }
                     }
-                    ins.close()
-                    reader.close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error reading bypass file $filename: $e")
                 }
