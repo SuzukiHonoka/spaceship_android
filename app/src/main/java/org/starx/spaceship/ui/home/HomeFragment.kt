@@ -38,10 +38,20 @@ class HomeFragment : Fragment() {
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Log.d(TAG, "Unified Service Connected")
-            val binder = service as UnifiedVPNService.LocalBinder
-            unifiedService = binder.getService()
-            isServiceBound = true
-            setRunning()
+            try {
+                val binder = service as? UnifiedVPNService.LocalBinder
+                binder?.let {
+                    unifiedService = it.getService()
+                    isServiceBound = true
+                    setRunning()
+                } ?: run {
+                    Log.e(TAG, "Failed to cast service binder")
+                    setNotRunning()
+                }
+            } catch (e: ClassCastException) {
+                Log.e(TAG, "Failed to cast service binder", e)
+                setNotRunning()
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -74,6 +84,12 @@ class HomeFragment : Fragment() {
 
         // construct result receiver for VPN preparation
         vpnPrepareLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            // Check if fragment is still attached
+            if (!isAdded || context == null) {
+                Log.w(TAG, "Fragment not attached, ignoring VPN preparation result")
+                return@registerForActivityResult
+            }
+            
             if (result.resultCode == Activity.RESULT_OK) {
                 // VPN permission granted, now start the service
                 Log.d(TAG, "VPN permission granted")
@@ -81,12 +97,17 @@ class HomeFragment : Fragment() {
                     requireContext().startForegroundService(serviceIntent)
                     bindUnifiedService()
                     pendingServiceIntent = null
+                    Snackbar.make(
+                        requireActivity().findViewById(android.R.id.content),
+                        "Service started", Snackbar.LENGTH_LONG
+                    ).show()
                 }
             } else {
                 // VPN permission denied, reset switch
                 Log.w(TAG, "VPN permission denied")
                 pendingServiceIntent = null
                 setNotRunning()
+                serviceSwitch.isEnabled = true
                 Snackbar.make(
                     requireActivity().findViewById(android.R.id.content),
                     "VPN permission denied", Snackbar.LENGTH_SHORT
@@ -202,6 +223,7 @@ class HomeFragment : Fragment() {
         val settings = Settings(ctx)
         if (!settings.validate()) {
             setNotRunning()
+            serviceSwitch.isEnabled = true
             Snackbar.make(
                 requireActivity().findViewById(android.R.id.content),
                 "Configuration not valid", Snackbar.LENGTH_SHORT
@@ -219,7 +241,7 @@ class HomeFragment : Fragment() {
         val serviceIntent = Intent(ctx, UnifiedVPNService::class.java).apply {
             putExtra("config", configString)
             putExtra("port", settings.socksPort)
-            putExtra("remote_dns",settings.enableRemoteDns)
+            putExtra("remote_dns", settings.enableRemoteDns)
             putExtra("ipv6", settings.enableIpv6)
             putExtra("bypass", settings.bypass)
             putExtra("vpn_mode", settings.enableVPN)
@@ -233,6 +255,9 @@ class HomeFragment : Fragment() {
                 // Store the service intent for later use after VPN preparation
                 pendingServiceIntent = serviceIntent
                 vpnPrepareLauncher!!.launch(intent)
+                // Don't show success message yet, wait for VPN permission
+                serviceSwitch.isEnabled = true
+                return
             } else {
                 // VPN already prepared, start service
                 ctx.startForegroundService(serviceIntent)
@@ -280,17 +305,31 @@ class HomeFragment : Fragment() {
         ).show()
     }
 
-    private fun unbindUnifiedService(){
+    private fun unbindUnifiedService() {
         if (isServiceBound) {
-            requireActivity().unbindService(serviceConnection)
-            isServiceBound = false
-            unifiedService = null
+            try {
+                requireActivity().unbindService(serviceConnection)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Service was not bound", e)
+            } finally {
+                isServiceBound = false
+                unifiedService = null
+            }
         }
     }
 
     private fun bindUnifiedService() {
-        val serviceIntent = Intent(requireContext(), UnifiedVPNService::class.java)
-        requireContext().bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+        if (!isServiceBound) {
+            val serviceIntent = Intent(requireContext(), UnifiedVPNService::class.java)
+            try {
+                val bound = requireContext().bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+                if (!bound) {
+                    Log.w(TAG, "Failed to bind to service")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error binding to service", e)
+            }
+        }
     }
 
     private fun setRunning(){
