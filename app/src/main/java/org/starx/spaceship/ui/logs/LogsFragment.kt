@@ -24,7 +24,7 @@ class LogsFragment : Fragment() {
     private var autoScrolling = true
     private var lastDisplayedLength = 0  // Track what's already displayed
 
-    companion object{
+    companion object {
         const val TAG = "LogsFragment"
         const val TAG_LOGS = "GoLog"
     }

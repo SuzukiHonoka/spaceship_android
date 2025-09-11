@@ -57,10 +57,10 @@ class EditTextUtil(val et: EditTextPreference) {
     private fun setMask(char: Char): EditTextUtil {
         et.summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
             val text = preference.text
-            if (TextUtils.isEmpty(text)) {
+            if (text.isNullOrEmpty()) {
                 "Not set"
             } else {
-                char.toString().repeat(text!!.length)
+                char.toString().repeat(text.length)
             }
         }
         return this
@@ -69,13 +69,10 @@ class EditTextUtil(val et: EditTextPreference) {
     fun setSuffix(suffix: String): EditTextUtil {
         et.summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
             val text = preference.text
-            if (TextUtils.isEmpty(text)) {
+            if (text.isNullOrEmpty()) {
                 "Not set"
             } else {
-                val sb = StringBuilder()
-                sb.append(text)
-                sb.append(suffix)
-                sb
+                "$text$suffix"
             }
         }
         return this

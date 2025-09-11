@@ -13,8 +13,8 @@ import org.starx.spaceship.MainActivity
 import org.starx.spaceship.R
 
 class ServiceUtil {
-    companion object{
-        fun createNotificationChannel(ctx: Context, id: String, name: CharSequence, importance: Int = NotificationManager.IMPORTANCE_DEFAULT){
+    companion object {
+        fun createNotificationChannel(ctx: Context, id: String, name: CharSequence, importance: Int = NotificationManager.IMPORTANCE_DEFAULT) {
             val serviceChannel = NotificationChannel(id, name, importance)
             val notificationManager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(serviceChannel)
