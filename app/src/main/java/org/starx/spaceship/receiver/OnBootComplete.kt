@@ -22,6 +22,7 @@ class OnBootComplete : BroadcastReceiver() {
         val serviceIntent = Intent(context, UnifiedVPNService::class.java).apply {
             putExtra("config", configString)
             putExtra("port", settings.socksPort)
+            putExtra("remote_dns", settings.enableRemoteDns)
             putExtra("ipv6", settings.enableIpv6)
             putExtra("bypass", settings.bypass)
             putExtra("vpn_mode", settings.enableVPN)

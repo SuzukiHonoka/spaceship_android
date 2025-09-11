@@ -16,6 +16,7 @@ import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -380,9 +381,11 @@ class UnifiedVPNService : VpnService() {
     private fun stopProxyService() {
         Log.d(TAG, "Stopping proxy service")
         
-        // Cancel the proxy job first
-        proxyJob?.cancel()
+        // Set stopping flag first to prevent race conditions
         proxyIsRunning.set(false)
+        
+        // Cancel the proxy job
+        proxyJob?.cancel()
         
         // Stop launcher asynchronously to avoid blocking
         launcher?.let { launcherRef ->
@@ -392,14 +395,23 @@ class UnifiedVPNService : VpnService() {
                     Log.d(TAG, "Proxy service stopped")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error stopping proxy: $e")
+                } finally {
+                    launcher = null
                 }
-                launcher = null
             }
+        } ?: run {
+            launcher = null
         }
     }
 
     private fun stopVpnService() {
         Log.d(TAG, "Stopping VPN service")
+        
+        // Set stopping flag first to prevent race conditions
+        vpnIsRunning.set(false)
+        
+        // Cancel VPN job first
+        vpnJob?.cancel()
         
         // Stop engine
         try {
@@ -407,18 +419,20 @@ class UnifiedVPNService : VpnService() {
                 // Note: Engine.stop() method might not be available
                 // engine!!.stop()
                 Log.d(TAG, "VPN engine stopped")
+                engine = null
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping engine: $e")
         }
         
         // Close VPN interface
-        vpnInterface?.close()
-        vpnInterface = null
-        
-        // Cancel VPN job
-        vpnJob?.cancel()
-        vpnIsRunning.set(false)
+        try {
+            vpnInterface?.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error closing VPN interface: $e")
+        } finally {
+            vpnInterface = null
+        }
     }
 
     fun stopService(stopVpnOnly: Boolean = false) {
@@ -461,10 +475,18 @@ class UnifiedVPNService : VpnService() {
 
         isServiceRunning = false
         
-        // Stop services asynchronously to avoid blocking onDestroy
-        stopVpnService()
-        stopProxyService()
-        releaseWakeLock()
+        // Stop services synchronously in onDestroy to ensure proper cleanup
+        try {
+            stopVpnService()
+            stopProxyService()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during service cleanup in onDestroy: $e")
+        } finally {
+            releaseWakeLock()
+            // Cancel coroutine scope
+            serviceScope?.cancel()
+            serviceScope = null
+        }
 
         Toast.makeText(applicationContext, "Service stopped", Toast.LENGTH_SHORT).show()
     }
@@ -514,26 +536,34 @@ class UnifiedVPNService : VpnService() {
 
     @SuppressLint("WakelockTimeout")
     private fun acquireWakeLock() {
-        if (wakeLock != null) {
+        if (wakeLock?.isHeld == true) {
             Log.d(TAG, "WakeLock already acquired: $wakeLock")
             return
         }
 
         Log.d(TAG, "Acquiring WakeLock")
-        wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).run {
-            newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
-                setReferenceCounted(false)
-                acquire()
+        try {
+            wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).run {
+                newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
             }
+            Log.d(TAG, "WakeLock acquired: $wakeLock")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire WakeLock: $e")
         }
-        Log.d(TAG, "WakeLock acquired: $wakeLock")
     }
 
     private fun releaseWakeLock() {
         wakeLock?.let {
-            if (it.isHeld) {
-                it.release()
-                Log.d(TAG, "WakeLock released: $it")
+            try {
+                if (it.isHeld) {
+                    it.release()
+                    Log.d(TAG, "WakeLock released: $it")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing WakeLock: $e")
             }
         }
         wakeLock = null

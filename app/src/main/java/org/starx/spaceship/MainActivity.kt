@@ -121,14 +121,15 @@ class MainActivity : AppCompatActivity() {
                 // extract resource
                 try {
                     Resource(applicationContext).extract()
+                    // Update version only after successful extraction
+                    runtime.resourceVersion = Resource.VERSION
+                    Log.i(TAG, "extract version: ${Resource.VERSION} done")
                 }
                 catch (e: IOException) {
                     Log.e(TAG, "extract resource failed: $e")
+                    // Don't update version if extraction failed
                     return@Thread
                 }
-
-                runtime.resourceVersion = Resource.VERSION
-                Log.i(TAG, "extract version: ${Resource.VERSION} done")
             }.start()
             return
         }

@@ -121,7 +121,26 @@ class Settings(private val ctx: Context) {
         set(value) = edit.putString(ctx.getString(R.string.server_idle_timeout_key), value.toString()).apply()
 
     fun validate(): Boolean {
-        return setOf(server, userID).all {  it != ""} && (serverPort in 0..65535)
+        // Check required fields are not empty or blank
+        if (server.isBlank() || userID.isBlank()) {
+            return false
+        }
+        
+        // Check port range
+        if (serverPort !in 1..65535) {
+            return false
+        }
+        
+        // Check local ports don't conflict and are valid
+        if (socksPort !in 1..65535 || httpPort !in 1..65535) {
+            return false
+        }
+        
+        if (socksPort == httpPort) {
+            return false
+        }
+        
+        return true
     }
 
     fun saveConfiguration(cfg: Configuration) {
