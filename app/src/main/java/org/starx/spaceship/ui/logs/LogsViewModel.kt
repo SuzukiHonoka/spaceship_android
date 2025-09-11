@@ -18,38 +18,47 @@ class LogsViewModel : ViewModel() {
     val logs: LiveData<String> = _logs
 
     private var collectJob: Job? = null
+    private var logProcess: Process? = null
 
     companion object {
         const val TAG = "LogsViewModel"
+        const val MAX_BUFFER_SIZE = 100000
+        const val TRIM_TO_SIZE = 50000
     }
 
     fun startLogCollection(tag: String?) {
         // Don't start if already collecting
-        if (collectJob?.isActive == true) return
+        if (collectJob?.isActive == true) {
+            Log.d(TAG, "Log collection already active")
+            return
+        }
 
         collectJob = MainScope().launch {
             withContext(Dispatchers.IO) {
                 val logBuffer = StringBuilder()
+                var reader: BufferedReader? = null
+                
                 try {
                     val command = if (tag != null) {
-                        arrayOf("/system/bin/logcat", "-v", "raw", "-s", tag)
+                        arrayOf("/system/bin/logcat", "-v", "time", "-s", tag)
                     } else {
-                        arrayOf("/system/bin/logcat", "-v", "raw")
+                        arrayOf("/system/bin/logcat", "-v", "time")
                     }
 
-                    val process = Runtime.getRuntime().exec(command)
-                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    logProcess = Runtime.getRuntime().exec(command)
+                    reader = BufferedReader(InputStreamReader(logProcess!!.inputStream))
 
                     var line: String?
-                    while (isActive) {
+                    while (isActive && logProcess?.isAlive == true) {
                         line = reader.readLine()
                         if (line != null) {
                             logBuffer.append(line).append("\n")
 
                             // Prevent buffer from growing too large
-                            if (logBuffer.length > 100000) {
-                                val newStart = logBuffer.length - 50000
+                            if (logBuffer.length > MAX_BUFFER_SIZE) {
+                                val newStart = logBuffer.length - TRIM_TO_SIZE
                                 logBuffer.delete(0, newStart)
+                                logBuffer.insert(0, "... (log truncated) ...\n")
                             }
 
                             withContext(Dispatchers.Main) {
@@ -57,7 +66,6 @@ class LogsViewModel : ViewModel() {
                             }
                         }
                     }
-                    process.destroy()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error reading logcat", e)
                     val errorMsg = "Error reading logs: ${e.message}\n"
@@ -66,19 +74,47 @@ class LogsViewModel : ViewModel() {
                     withContext(Dispatchers.Main) {
                         _logs.value = logBuffer.toString()
                     }
+                } finally {
+                    try {
+                        reader?.close()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error closing reader", e)
+                    }
+                    
+                    try {
+                        logProcess?.destroy()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error destroying process", e)
+                    }
+                    logProcess = null
                 }
             }
         }
     }
 
     fun stopLogCollection() {
-        _logs.value = ""
+        Log.d(TAG, "Stopping log collection")
+        
+        // Cancel the collection job
         collectJob?.cancel()
         collectJob = null
+        
+        // Stop and cleanup the logcat process
+        try {
+            logProcess?.destroy()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping logcat process", e)
+        } finally {
+            logProcess = null
+        }
+        
+        // Clear logs
+        _logs.value = ""
     }
 
     override fun onCleared() {
         super.onCleared()
+        Log.d(TAG, "ViewModel cleared")
         stopLogCollection()
     }
 }

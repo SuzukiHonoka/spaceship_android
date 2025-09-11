@@ -7,6 +7,9 @@ class JsonFactory {
         val processor = Json {
             encodeDefaults = true
             explicitNulls = false
+            ignoreUnknownKeys = true // Handle future configuration versions gracefully
+            isLenient = true // Allow more flexible JSON parsing
+            coerceInputValues = true // Handle type mismatches gracefully
         }
     }
 }

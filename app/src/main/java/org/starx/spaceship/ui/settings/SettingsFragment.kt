@@ -65,29 +65,60 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private fun handleImport() {
         val ctx = requireContext()
         val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        
         if (!clipboardManager.hasPrimaryClip()) {
             Toast.makeText(ctx, "Copy configuration to clipboard first!", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val clip = clipboardManager.primaryClip!!.getItemAt(0).text.toString()
-        try {
-            val cfg = JsonFactory.processor.decodeFromString(Configuration.serializer(), clip)
-            Settings(ctx).saveConfiguration(cfg)
-        } catch (e: java.lang.Exception) {
-            Log.e(TAG, "clip: $clip error: $e")
-            Toast.makeText(ctx, "parse configuration failed: $e", Toast.LENGTH_SHORT).show()
+        val clipItem = clipboardManager.primaryClip?.getItemAt(0)
+        if (clipItem?.text == null) {
+            Toast.makeText(ctx, "Clipboard contains no text!", Toast.LENGTH_SHORT).show()
             return
         }
-        Toast.makeText(ctx, "Configuration imported", Toast.LENGTH_SHORT).show()
+
+        val clip = clipItem.text.toString().trim()
+        if (clip.isBlank()) {
+            Toast.makeText(ctx, "Clipboard is empty!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val cfg = JsonFactory.processor.decodeFromString(Configuration.serializer(), clip)
+            
+            // Validate the configuration before saving
+            if (cfg.serverAddress.isBlank() || cfg.uuid.isBlank()) {
+                Toast.makeText(ctx, "Invalid configuration: missing required fields", Toast.LENGTH_SHORT).show()
+                return
+            }
+            
+            Settings(ctx).saveConfiguration(cfg)
+            Toast.makeText(ctx, "Configuration imported successfully", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Import failed - clip: $clip, error: $e")
+            Toast.makeText(ctx, "Failed to parse configuration: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun handleExport() {
         val ctx = requireContext()
-        val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clipData = ClipData.newPlainText("config", Settings(ctx).toJson())
-        clipboardManager.setPrimaryClip(clipData)
-        Toast.makeText(ctx, "Configuration copied", Toast.LENGTH_SHORT).show()
+        
+        try {
+            val settings = Settings(ctx)
+            if (!settings.validate()) {
+                Toast.makeText(ctx, "Cannot export: configuration is invalid", Toast.LENGTH_SHORT).show()
+                return
+            }
+            
+            val configJson = settings.toJson()
+            val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = ClipData.newPlainText("config", configJson)
+            clipboardManager.setPrimaryClip(clipData)
+            Toast.makeText(ctx, "Configuration copied to clipboard", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Export failed: $e")
+            Toast.makeText(ctx, "Failed to export configuration: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun refresh() {
@@ -100,24 +131,32 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun applyConstrains() {
-        val portOnly = setOf<EditTextPreference>(
-            findPreference(getString(R.string.server_port_key))!!,
-            findPreference(getString(R.string.inbound_socks_port_key))!!,
-            findPreference(getString(R.string.inbound_http_port_key))!!,
-        )
-        portOnly.forEach {
-            EditTextUtil(it).setNumberOnly(1, 65535)
+        val portPreferences = listOf(
+            getString(R.string.server_port_key),
+            getString(R.string.inbound_socks_port_key),
+            getString(R.string.inbound_http_port_key)
+        ).mapNotNull { key -> 
+            findPreference<EditTextPreference>(key)
         }
-        EditTextUtil(findPreference(getString(R.string.server_mux_key))!!).setNumberOnly(0, 255)
-        EditTextUtil(findPreference(getString(R.string.server_buffer_key))!!).setNumberOnly(
-            1,
-            65535
-        ).setSuffix("KB")
-        EditTextUtil(
-            findPreference(getString(R.string.user_id_key))!!
-        ).setPasswordWithMask()
-        EditTextUtil(
-            findPreference(getString(R.string.server_idle_timeout_key))!!
-        ).setNumberOnly().setSuffix("s")
+        
+        portPreferences.forEach { pref ->
+            EditTextUtil(pref).setNumberOnly(1, 65535)
+        }
+        
+        findPreference<EditTextPreference>(getString(R.string.server_mux_key))?.let { pref ->
+            EditTextUtil(pref).setNumberOnly(0, 255)
+        }
+        
+        findPreference<EditTextPreference>(getString(R.string.server_buffer_key))?.let { pref ->
+            EditTextUtil(pref).setNumberOnly(1, 65535).setSuffix("KB")
+        }
+        
+        findPreference<EditTextPreference>(getString(R.string.user_id_key))?.let { pref ->
+            EditTextUtil(pref).setPasswordWithMask()
+        }
+        
+        findPreference<EditTextPreference>(getString(R.string.server_idle_timeout_key))?.let { pref ->
+            EditTextUtil(pref).setNumberOnly().setSuffix("s")
+        }
     }
 }

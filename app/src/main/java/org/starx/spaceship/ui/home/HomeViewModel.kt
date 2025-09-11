@@ -31,31 +31,33 @@ class HomeViewModel : ViewModel() {
     private var isDiscoveryActive = false
 
     fun startConnectivityDiscovery(context: android.content.Context) {
-        if (connectivity != null) {
+        if (connectivity != null && isDiscoveryActive) {
             Log.d(TAG, "Connectivity discovery already started.")
-            // Even if we already have a connectivity instance, we should ensure the callback is active
-            isDiscoveryActive = true
             return
         }
+
+        // Stop existing discovery first to prevent multiple instances
+        stopConnectivityDiscovery()
 
         connectivity = Connectivity(context)
         isDiscoveryActive = true
 
         connectivity!!.discoverWifiNetworkInfo { info ->
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                // Check if callback should still be processed
-                if (!isDiscoveryActive) {
+            // Use main thread handler safely
+            val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+            mainHandler.post {
+                // Check if ViewModel is still active and callback should be processed
+                if (!isDiscoveryActive || connectivity == null) {
                     return@post
                 }
 
                 if (info != null && info.ipAddresses != null && info.ipAddresses.isNotEmpty()) {
                     // Find the first IPv4 address
                     val ip = info.ipAddresses.firstOrNull { it is java.net.Inet4Address }?.hostAddress ?: ""
-                    _localIp.postValue(ip) // Using postValue for safety from background threads
-                    return@post
+                    setLocalIp(ip) // Use setter for consistency
+                } else {
+                    setLocalIp("")
                 }
-
-                _localIp.postValue("")
             }
         }
     }
