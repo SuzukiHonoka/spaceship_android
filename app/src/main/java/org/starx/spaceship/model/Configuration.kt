@@ -17,7 +17,7 @@ data class Configuration(
     @SerialName("listen_http")
     val listenHttp: String,
     @SerialName("listen_dns")
-    val listenDns: String,
+    val listenDns: String? = null,
     @SerialName("basic_auth")
     val basicAuth: List<String>? = null,
     val dns: DNS,

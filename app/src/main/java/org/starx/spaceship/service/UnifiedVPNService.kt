@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.starx.spaceship.MainActivity
 import org.starx.spaceship.util.Resource
 import org.starx.spaceship.util.ServiceUtil
@@ -217,8 +218,16 @@ class UnifiedVPNService : VpnService() {
         }
     }
 
-    private fun buildTunnel() {
+    private suspend fun buildTunnel() {
         Log.i(TAG, "buildTunnel")
+
+        // Check if VPN permission is granted
+        val vpnIntent = prepare(this)
+        if (vpnIntent != null) {
+            Log.e(TAG, "VPN permission not granted")
+            throw SecurityException("VPN permission required")
+        }
+
         val builder = Builder()
 
         val pendingIntent = PendingIntent.getActivity(
@@ -261,7 +270,16 @@ class UnifiedVPNService : VpnService() {
         }
 
         Log.i(TAG, "establishing tunnel")
-        vpnInterface = localTunnel.establish()
+        // Add timeout for tunnel establishment
+        vpnInterface = withTimeout(10000) { // 10 second timeout
+            localTunnel.establish()
+        } ?: throw RuntimeException("Failed to establish VPN tunnel")
+
+        if (vpnInterface == null) {
+            throw RuntimeException("Failed to establish VPN tunnel - interface is null")
+        }
+
+        Log.i(TAG, "tunnel established successfully")
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
