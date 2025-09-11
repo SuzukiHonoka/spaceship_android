@@ -57,6 +57,7 @@ class HomeFragment : Fragment() {
     private lateinit var serviceSwitch: MaterialSwitch
 
     private var vpnPrepareLauncher: ActivityResultLauncher<Intent>? = null
+    private var pendingServiceIntent: Intent? = null
 
     // This property is only valid between onCreateView and
     // onDestroyView.
@@ -74,12 +75,18 @@ class HomeFragment : Fragment() {
         // construct result receiver for VPN preparation
         vpnPrepareLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                // VPN permission granted, service is already started
+                // VPN permission granted, now start the service
                 Log.d(TAG, "VPN permission granted")
+                pendingServiceIntent?.let { serviceIntent ->
+                    requireContext().startForegroundService(serviceIntent)
+                    bindUnifiedService()
+                    pendingServiceIntent = null
+                }
             } else {
-                // VPN permission denied, stop service
+                // VPN permission denied, reset switch
                 Log.w(TAG, "VPN permission denied")
-                stopService()
+                pendingServiceIntent = null
+                setNotRunning()
                 Snackbar.make(
                     requireActivity().findViewById(android.R.id.content),
                     "VPN permission denied", Snackbar.LENGTH_SHORT
@@ -223,9 +230,8 @@ class HomeFragment : Fragment() {
             val intent = VpnService.prepare(ctx)
             // prepare if not prepared before
             if (intent != null) {
-                // Start the service first, then prepare VPN
-                ctx.startForegroundService(serviceIntent)
-                bindUnifiedService()
+                // Store the service intent for later use after VPN preparation
+                pendingServiceIntent = serviceIntent
                 vpnPrepareLauncher!!.launch(intent)
             } else {
                 // VPN already prepared, start service
