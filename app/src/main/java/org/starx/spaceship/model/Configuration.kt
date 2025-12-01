@@ -27,5 +27,6 @@ data class Configuration(
     @SerialName("idle_timeout")
     val idleTimeout: Int?,
 ) {
+    @Suppress("unused")
     val role = "client"
 }

@@ -251,12 +251,12 @@ class UnifiedVPNService : VpnService() {
         if (enableIpv6) {
             dnsServerSet.addAll(setOf(TUNNEL_DNS_IPV6_PRIMARY, TUNNEL_DNS_IPV6_SECONDARY))
         }
-        dnsServerSet.forEach { it->
+        dnsServerSet.forEach {
             localTunnel.addDnsServer(it)
         }
 
         if (enableRemoteDns) {
-            dnsServerSet.forEach { it->
+            dnsServerSet.forEach {
                 localTunnel.addRoute(it, if (InetAddress.getByName(it) is Inet4Address) 32 else 128)
             }
         }

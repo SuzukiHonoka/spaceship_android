@@ -1,7 +1,6 @@
 package org.starx.spaceship.util
 
 import android.text.InputType
-import android.text.TextUtils
 import android.widget.Toast
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference

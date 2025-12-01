@@ -130,7 +130,7 @@ class Settings(private val ctx: Context) {
     fun saveConfiguration(cfg: Configuration) {
         //val outer = Json.decodeFromString(Configuration.serializer(), "")
         val d = cfg.serverAddress.lastIndexOf(':')
-        server = cfg.serverAddress.substring(0, d)
+        server = cfg.serverAddress.take(d)
         serverPort = cfg.serverAddress.substring(d + 1).toInt()
         sni = cfg.host
         serviceName = cfg.path
