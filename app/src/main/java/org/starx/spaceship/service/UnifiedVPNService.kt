@@ -185,13 +185,13 @@ class UnifiedVPNService : VpnService() {
 
                 // Toast message on main thread
                 withContext(Dispatchers.Main) {
+                    if (proxyJob?.isActive == true) {
+                        if (vpnIsRunning.get()) stopVpnService()
+                        // proxy stopped, stop the service
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
                     Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
-                }
-
-                // If proxy fails and VPN is not running, stop the service
-                if (!vpnIsRunning.get()) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
                 }
             }
             return
@@ -379,7 +379,6 @@ class UnifiedVPNService : VpnService() {
 
     private fun stopProxyService() {
         Log.d(TAG, "Stopping proxy service")
-        
         // Set stopping flag first to prevent race conditions
         proxyIsRunning.set(false)
         
@@ -416,7 +415,7 @@ class UnifiedVPNService : VpnService() {
         try {
             engine?.let {
                 // Note: Engine.stop() method might not be available
-                // engine!!.stop()
+                engine!!.stop()
                 Log.d(TAG, "VPN engine stopped")
                 engine = null
             }
@@ -446,23 +445,24 @@ class UnifiedVPNService : VpnService() {
                 "Proxy Service running"
             )
             startForeground(NOTIFICATION_ID, notification)
-        } else {
-            // Stop services asynchronously to avoid blocking
-            stopVpnService()
-            stopProxyService()
-            
-            // Schedule service shutdown to ensure it happens even if cleanup takes time
-            serviceScope?.launch {
-                try {
-                    // Give a brief moment for cleanup, but don't wait too long
-                    kotlinx.coroutines.delay(500) // 0.5 second max wait
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error during service shutdown delay: $e")
-                } finally {
-                    withContext(Dispatchers.Main) {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                        stopSelf()
-                    }
+            return
+        }
+
+        // Stop services asynchronously to avoid blocking
+        stopVpnService()
+        stopProxyService()
+
+        // Schedule service shutdown to ensure it happens even if cleanup takes time
+        serviceScope?.launch {
+            try {
+                // Give a brief moment for cleanup, but don't wait too long
+                kotlinx.coroutines.delay(500) // 0.5 second max wait
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during service shutdown delay: $e")
+            } finally {
+                withContext(Dispatchers.Main) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
                 }
             }
         }

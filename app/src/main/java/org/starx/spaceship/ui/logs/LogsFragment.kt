@@ -98,13 +98,6 @@ class LogsFragment : Fragment() {
         logsViewModel.startLogCollection(TAG_LOGS)
     }
 
-    override fun onStop() {
-        super.onStop()
-        // Stop log collection when fragment is not visible
-        Log.i(TAG, "Stopping log collection")
-        logsViewModel.stopLogCollection()
-    }
-
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null

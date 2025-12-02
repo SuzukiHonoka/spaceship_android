@@ -26,6 +26,10 @@ class LogsViewModel : ViewModel() {
         const val TRIM_TO_SIZE = 50000
     }
 
+    fun setLogs(logData: String) {
+        _logs.value = logData
+    }
+
     fun startLogCollection(tag: String?) {
         // Don't start if already collecting
         if (collectJob?.isActive == true) {
@@ -40,8 +44,8 @@ class LogsViewModel : ViewModel() {
                 
                 try {
                     val command = tag?.let {
-                        arrayOf("/system/bin/logcat", "-v", "time", "-s", it)
-                    } ?: arrayOf("/system/bin/logcat", "-v", "time")
+                        arrayOf("/system/bin/logcat", "-v", "time", "-T", "1", "-s", it)
+                    } ?: arrayOf("/system/bin/logcat", "-v", "time", "-T", "1")
 
                     logProcess = Runtime.getRuntime().exec(command)
                     reader = BufferedReader(InputStreamReader(logProcess!!.inputStream))

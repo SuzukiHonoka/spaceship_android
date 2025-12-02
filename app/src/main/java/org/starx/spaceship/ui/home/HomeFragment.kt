@@ -23,6 +23,7 @@ import org.starx.spaceship.databinding.FragmentHomeBinding
 import org.starx.spaceship.service.UnifiedVPNService
 import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.store.Settings
+import org.starx.spaceship.ui.logs.LogsViewModel
 import org.starx.spaceship.util.Resource
 import spaceship_aar.Spaceship_aar
 
@@ -64,6 +65,8 @@ class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private lateinit var homeViewModel: HomeViewModel
+    private lateinit var logsViewModel: LogsViewModel
+
     private lateinit var serviceSwitch: MaterialSwitch
 
     private var vpnPrepareLauncher: ActivityResultLauncher<Intent>? = null
@@ -146,6 +149,8 @@ class HomeFragment : Fragment() {
 
         serviceSwitch = binding.serviceSwitch
         serviceSwitch.setOnCheckedChangeListener(null)
+
+        logsViewModel = ViewModelProvider(requireActivity())[LogsViewModel::class.java]
         return binding.root
     }
 
@@ -203,7 +208,7 @@ class HomeFragment : Fragment() {
             return
         }
 
-        if (unifiedService != null && unifiedService!!.isRunning()) stopService()
+        if (unifiedService != null) stopService()
     }
 
     private fun setSwitch(isChecked: Boolean) {
@@ -230,6 +235,8 @@ class HomeFragment : Fragment() {
             ).show()
             return
         }
+        // clear logs
+        logsViewModel.setLogs("")
 
         // check connectivity if needed
         if (settings.allowOther) {
