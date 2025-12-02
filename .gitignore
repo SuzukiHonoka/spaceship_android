@@ -16,3 +16,4 @@ local.properties
 /app/src/main/assets/opt/fakeca.pem
 /.idea
 /.kotlin
+.vscode/
