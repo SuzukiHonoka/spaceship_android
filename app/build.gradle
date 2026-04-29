@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace = 'org.starx.spaceship'
-    compileSdk = 36
+    compileSdk 37
 
     defaultConfig {
         applicationId = "org.starx.spaceship"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 171
         versionName = '1.7.1'
         ndk {
@@ -49,28 +49,28 @@ android {
         viewBinding = true
     }
 
-    buildToolsVersion = '36.1.0'
+    buildToolsVersion = '37.0.0'
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
     }
     ndkVersion = '29.0.14206865'
-    compileSdkMinor = 1
+    compileSdkMinor 0
 }
 
 dependencies {
-    implementation 'androidx.core:core-ktx:1.17.0'
+    implementation 'androidx.core:core-ktx:1.18.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'com.google.android.material:material:1.13.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.10.0'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.10.0'
-    implementation 'androidx.navigation:navigation-fragment-ktx:2.9.6'
-    implementation 'androidx.navigation:navigation-ui-ktx:2.9.6'
+    implementation 'androidx.navigation:navigation-fragment-ktx:2.9.8'
+    implementation 'androidx.navigation:navigation-ui-ktx:2.9.8'
     implementation 'androidx.compose.material3:material3:1.4.0'
     implementation 'androidx.compose.material3:material3-window-size-class:1.4.0'
     implementation 'androidx.preference:preference-ktx:1.2.1'
-    implementation('io.ktor:ktor-serialization-kotlinx-json:3.3.3')
+    implementation('io.ktor:ktor-serialization-kotlinx-json:3.4.3')
     implementation files('libs/spaceship_aar.aar')
     implementation files('libs/spaceship_aar-sources.jar')
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'

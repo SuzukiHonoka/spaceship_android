@@ -51,7 +51,7 @@ class HomeViewModel : ViewModel() {
                     return@post
                 }
 
-                if (info != null && info.ipAddresses != null && info.ipAddresses.isNotEmpty()) {
+                if (info != null && !info.ipAddresses.isNullOrEmpty()) {
                     // Find the first IPv4 address
                     val ip = info.ipAddresses.firstOrNull { it is java.net.Inet4Address }?.hostAddress ?: ""
                     setLocalIp(ip) // Use setter for consistency
