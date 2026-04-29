@@ -13,13 +13,17 @@ import android.os.PowerManager
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.starx.spaceship.MainActivity
 import org.starx.spaceship.util.Resource
 import org.starx.spaceship.util.ServiceUtil
@@ -37,17 +41,22 @@ class UnifiedVPNService : VpnService() {
     private val binder = LocalBinder()
     
     // Proxy (SOCKS5) server state
-    private var proxyIsRunning = AtomicBoolean(false)
-    private var proxyIsFailed = AtomicBoolean(false)
-    private var proxyJob: Job? = null
-    private var launcher: spaceship_aar.LauncherWrapper? = null
+    // AtomicBoolean fields are inherently thread-safe — use val, the reference never changes.
+    private val proxyIsRunning = AtomicBoolean(false)
+    private val proxyIsFailed = AtomicBoolean(false)
+    // These are written/read from different threads — @Volatile for visibility.
+    @Volatile private var proxyJob: Job? = null
+    @Volatile private var launcher: spaceship_aar.LauncherWrapper? = null
     private var launcherConfig: String? = null
-    
+
     // VPN tunnel state
-    private var vpnIsRunning = AtomicBoolean(false)
-    private var vpnJob: Job? = null
-    private var vpnInterface: ParcelFileDescriptor? = null
-    private var engine: spaceship_aar.Engine? = null
+    // vpnStopSignal is the single source of truth: created when VPN starts, completed
+    // (from any thread) when we want the VPN job to stop. No polling needed.
+    @Volatile private var vpnStopSignal: CompletableDeferred<Unit>? = null
+    @Volatile private var vpnJob: Job? = null
+    // Written by the VPN coroutine (IO), read/nulled by stopVpnService (any thread).
+    @Volatile private var vpnInterface: ParcelFileDescriptor? = null
+    @Volatile private var engine: spaceship_aar.Engine? = null
     
     // Service configuration
     private var socksPort: Int = 10818
@@ -67,6 +76,7 @@ class UnifiedVPNService : VpnService() {
         const val CHANNEL_NAME = "Spaceship VPN Service"
         const val NOTIFICATION_ID = 1
         
+        @Volatile
         var isServiceRunning = false
             private set
 
@@ -82,6 +92,13 @@ class UnifiedVPNService : VpnService() {
         const val TUNNEL_DNS_IPV6_SECONDARY = "2001:4860:4860::8844"
 
         const val TUNNEL_ADDRESS_IPV4_DNS = "127.0.0.1:58632"
+
+        // Cache for bypass-route IpPrefixes, keyed by "$bypassRule|$enableIpv6".
+        // Parsing 5500+ CIDRs from disk and creating IpPrefix objects takes ~750ms and
+        // causes a ~5ms GC pause. The CIDR files never change at runtime, so the cache
+        // persists for the process lifetime and is safe to reuse across service restarts.
+        @Volatile
+        private var ipPrefixCache: Pair<String, List<IpPrefix>>? = null
     }
 
     inner class LocalBinder : Binder() {
@@ -98,8 +115,9 @@ class UnifiedVPNService : VpnService() {
         // Set service running status
         isServiceRunning = true
         
-        // Initialize coroutine scope
-        serviceScope = CoroutineScope(Dispatchers.IO)
+        // Initialize coroutine scope — SupervisorJob ensures one child failure
+        // doesn't cancel sibling jobs (proxy vs VPN are independent)
+        serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -138,12 +156,15 @@ class UnifiedVPNService : VpnService() {
         val notification = ServiceUtil.buildNotification(applicationContext, CHANNEL_ID, notificationText)
         startForeground(NOTIFICATION_ID, notification)
 
-        // Stop existing services if running
-        stopProxyService()
-        stopVpnService()
+        // Stop any previously running services (e.g., unexpected system restart of a sticky
+        // service). On a clean first start nothing is running — skip the lock overhead.
+        if (proxyIsRunning.get() || vpnStopSignal != null) {
+            stopProxyService()
+            stopVpnService()
+        }
 
         // Start proxy service (always needed)
-        startProxyService(startId)
+        startProxyService()
         
         // Start VPN service if enabled
         if (enableVpnMode) {
@@ -158,40 +179,48 @@ class UnifiedVPNService : VpnService() {
         return START_STICKY
     }
 
-    private fun startProxyService(startId: Int) {
+    private fun startProxyService() {
         if (launcherConfig.isNullOrEmpty()) return
 
         if (proxyIsRunning.compareAndSet(false, true)) {
             proxyJob = serviceScope?.launch {
-                Log.d(TAG, "Starting proxy service with config: $launcherConfig")
+                Log.d(TAG, "Starting proxy service (config length: ${launcherConfig?.length})")
+                // Capture whether we exited naturally (not via cancellation / explicit stop)
+                val selfStopped: Boolean
                 try {
                     launcher = spaceship_aar.Spaceship_aar.newLauncher()
-                    launcher!!.launchFromString(launcherConfig)
+                    launcher!!.launchFromString(launcherConfig)  // blocks until Go exits or Stop() is called
+                    // proxyIsRunning is set to false by stopProxyService() BEFORE launcher.stop()
+                    // unblocks launchFromString. So if it's still true here, Go exited on its own.
+                    // (We cannot use isActive: cancel() is called AFTER stop(), so isActive is
+                    //  still true at this point even during an explicit stop.)
+                    selfStopped = proxyIsRunning.get()
                 } catch (e: Exception) {
                     proxyIsFailed.set(true)
                     Log.e(TAG, "Start proxy failed: ${e.message}")
+                    proxyIsRunning.set(false)
+                    return@launch
                 }
 
                 // Proxy service stopped
                 proxyIsRunning.set(false)
 
-                // Notify the user
                 val msg = "Proxy service exited ${
-                    if (proxyIsFailed.get()) "with internal error" 
-                    else if (proxyJob?.isActive == true) "unexpectedly" 
+                    if (proxyIsFailed.get()) "with internal error"
+                    else if (selfStopped) "unexpectedly"
                     else "normally"
                 }"
                 Log.d(TAG, msg)
 
-                // Toast message on main thread
-                withContext(Dispatchers.Main) {
-                    if (proxyJob?.isActive == true) {
-                        if (vpnIsRunning.get()) stopVpnService()
-                        // proxy stopped, stop the service
+                // Use NonCancellable so cleanup runs even if coroutine was canceled
+                withContext(NonCancellable + Dispatchers.Main) {
+                    Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
+                    if (selfStopped) {
+                        // Proxy died on its own — bring everything down cleanly
+                        if (vpnStopSignal != null) stopVpnService()
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     }
-                    Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
                 }
             }
             return
@@ -200,26 +229,43 @@ class UnifiedVPNService : VpnService() {
     }
 
     private fun startVpnService() {
-        if (vpnIsRunning.get()) {
+        if (vpnStopSignal != null) {
             Log.d(TAG, "VPN service is already started.")
             return
         }
 
+        val signal = CompletableDeferred<Unit>()
+        vpnStopSignal = signal
+
         vpnJob = serviceScope?.launch {
+            val tunFd: Int
             try {
-                buildTunnel()
-                startTun2socks()
+                tunFd = buildTunnel()
+                startTun2socks(tunFd)
             } catch (e: Exception) {
                 Log.e(TAG, "VPN service error: $e")
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(applicationContext, "VPN error: $e", Toast.LENGTH_SHORT).show()
-                }
+                // VPN failed to start — tear everything down so the proxy doesn't
+                // keep running headless and the UI switch resets correctly.
                 stopVpnService()
+                stopProxyService()
+                withContext(NonCancellable + Dispatchers.Main) {
+                    Toast.makeText(applicationContext, "VPN error: $e", Toast.LENGTH_SHORT).show()
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
+                return@launch
             }
+
+            // Suspend here until stopVpnService() fires the signal.
+            // No polling — zero CPU overhead, instant wakeup.
+            // Whoever fires the signal has already called stopVpnService() and
+            // is responsible for service lifecycle — do NOT call stopVpnService()
+            // again here or we double-close the VPN fd (fdsan SIGABRT).
+            signal.await()
         }
     }
 
-    private suspend fun buildTunnel() {
+    private suspend fun buildTunnel(): Int {
         Log.i(TAG, "buildTunnel")
 
         // Check if VPN permission is granted
@@ -271,66 +317,77 @@ class UnifiedVPNService : VpnService() {
         }
 
         Log.i(TAG, "establishing tunnel")
-        // Add timeout for tunnel establishment
-        vpnInterface = withTimeout(10000) { // 10 second timeout
-            localTunnel.establish()
-        } ?: throw RuntimeException("Failed to establish VPN tunnel")
-
-        if (vpnInterface == null) {
-            throw RuntimeException("Failed to establish VPN tunnel - interface is null")
-        }
+        // establish() is a blocking JNI call — withTimeout alone won't interrupt it.
+        // runInterruptible wraps it in a thread-interrupt-aware block so the timeout fires correctly.
+        vpnInterface = withTimeoutOrNull(10_000) {
+            runInterruptible { localTunnel.establish() }
+        } ?: throw RuntimeException("VPN tunnel establishment timed out or returned null")
 
         Log.i(TAG, "tunnel established successfully")
+
+        // Dup the fd and transfer the dup to Go with no fdsan owner.
+        // Java keeps the original ParcelFileDescriptor (tagged by Android's fdsan).
+        // Go gets an untagged dup it can freely close — no SIGABRT on engine.stop().
+        return vpnInterface!!.dup().detachFd()
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyBypassRules(builder: Builder) {
-        val ipPrefixList: MutableList<IpPrefix> = mutableListOf()
+        val cacheKey = "${bypassRule}|${enableIpv6}"
+        val cached = ipPrefixCache
 
-        if (bypassRule!!.contains("cn")) {
-            Log.i(TAG, "adding bypass rule: cn")
-            val fileList = mutableListOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4)
-            if (enableIpv6) fileList += listOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6)
+        val prefixes: List<IpPrefix>
+        if (cached != null && cached.first == cacheKey) {
+            Log.i(TAG, "applying ${cached.second.size} bypass routes (cached, skipping disk I/O)")
+            prefixes = cached.second
+        } else {
+            // Pre-size to avoid the ~13 ArrayList reallocations growing to 5506 entries.
+            val list = ArrayList<IpPrefix>(6000)
 
-            fileList.forEach { filename ->
-                try {
-                    Resource(applicationContext).getFile(filename).use { ins ->
-                        ins.bufferedReader().use { reader ->
-                            val lines = reader.readLines()
-                            Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
-                            
-                            lines.forEach { line ->
-                                try {
-                                    val cidr = parseCidrToIpPrefix(line)
-                                    ipPrefixList.add(cidr)
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "parse cidr failed: $e")
+            if (bypassRule!!.contains("cn")) {
+                Log.i(TAG, "adding bypass rule: cn")
+                val fileList = mutableListOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4)
+                if (enableIpv6) fileList += listOf(Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6)
+
+                fileList.forEach { filename ->
+                    try {
+                        Resource(applicationContext).getFile(filename).use { ins ->
+                            ins.bufferedReader().use { reader ->
+                                val lines = reader.readLines()
+                                Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
+                                lines.forEach { line ->
+                                    try {
+                                        list.add(parseCidrToIpPrefix(line))
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "parse cidr failed: $e")
+                                    }
                                 }
                             }
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error reading bypass file $filename: $e")
                     }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error reading bypass file $filename: $e")
                 }
             }
-        }
 
-        if (bypassRule!!.contains("lan")) {
-            Log.i(TAG, "adding bypass rule: lan")
-            Resource.LAN_CIDR.forEach { cidr ->
-                try {
-                    val ipPrefix = parseCidrToIpPrefix(cidr)
-                    ipPrefixList.add(ipPrefix)
-                } catch (e: Exception) {
-                    Log.e(TAG, "parse cidr failed: $e")
+            if (bypassRule!!.contains("lan")) {
+                Log.i(TAG, "adding bypass rule: lan")
+                Resource.LAN_CIDR.forEach { cidr ->
+                    try {
+                        list.add(parseCidrToIpPrefix(cidr))
+                    } catch (e: Exception) {
+                        Log.e(TAG, "parse cidr failed: $e")
+                    }
                 }
             }
+
+            Log.i(TAG, "applying bypass rule count: ${list.size}")
+            // toList() returns an immutable snapshot safe to share across threads/restarts.
+            prefixes = list.toList()
+            ipPrefixCache = Pair(cacheKey, prefixes)
         }
 
-        Log.i(TAG, "applying bypass rule count: ${ipPrefixList.size}")
-        ipPrefixList.forEach { ipPrefix ->
-            builder.excludeRoute(ipPrefix)
-        }
+        prefixes.forEach { builder.excludeRoute(it) }
 
         // preserve local-link
         Log.i(TAG, "applying local-link")
@@ -349,87 +406,79 @@ class UnifiedVPNService : VpnService() {
         return IpPrefix(inetAddress, prefixLength)
     }
 
-    private fun startTun2socks() {
-        try {
-            val key = spaceship_aar.EngineKey()
-            key.mark = 0
-            key.mtu = 1500
-            key.device = "fd://" + vpnInterface!!.fd
-            key.setInterface("")
-            key.logLevel = "error"
-            key.proxy = "socks5://127.0.0.1:$socksPort"
-            key.restAPI = ""
-            key.tcpSendBufferSize = ""
-            key.tcpReceiveBufferSize = ""
-            key.tcpModerateReceiveBuffer = false
-            key.udpDisabled = true // Disable UDP support by default
-            key.dnsAddr = if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else ""
-            Log.d(TAG, "Engine key: $key")
-
-            engine = spaceship_aar.Engine()
-            engine!!.insert(key)
-            engine!!.start()
-            Log.d(TAG, "VPN Engine started")
-            vpnIsRunning.set(true)
-        } catch (e: Exception) {
-            Log.e(TAG, "Engine error: $e")
-            throw e
-        }
+    private fun startTun2socks(tunFd: Int) {
+        val key = spaceship_aar.EngineKey()
+        key.mark = 0
+        key.mtu = 1500
+        key.device = "fd://$tunFd"
+        key.setInterface("")
+        key.logLevel = "error"
+        key.proxy = "socks5://127.0.0.1:$socksPort"
+        key.restAPI = ""
+        key.tcpSendBufferSize = ""
+        key.tcpReceiveBufferSize = ""
+        key.tcpModerateReceiveBuffer = false
+        key.udpDisabled = true
+        key.dnsAddr = if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else ""
+        Log.d(TAG, "Engine key: $key")
+        engine = spaceship_aar.Engine()
+        engine!!.insert(key)
+        engine!!.start()
+        Log.d(TAG, "VPN Engine started")
     }
 
     private fun stopProxyService() {
         Log.d(TAG, "Stopping proxy service")
-        // Set stopping flag first to prevent race conditions
         proxyIsRunning.set(false)
-        
-        // Cancel the proxy job
-        proxyJob?.cancel()
-        
-        // Stop launcher asynchronously to avoid blocking
-        launcher?.let { launcherRef ->
-            serviceScope?.launch {
-                try {
-                    launcherRef.stop()
-                    Log.d(TAG, "Proxy service stopped")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error stopping proxy: $e")
-                } finally {
-                    launcher = null
-                }
+
+        // Stop the Go launcher FIRST (synchronously) so launchFromString unblocks.
+        // Only then cancel the coroutine — otherwise the scope can be torn down
+        // before the async stop-coroutine runs, permanently leaking Go goroutines.
+        // Snapshot-and-null before calling stop() so a concurrent call sees null
+        // and skips, preventing double-stop.
+        val l = launcher
+        launcher = null
+        if (l != null) {
+            try {
+                l.stop()
+                Log.d(TAG, "Proxy launcher stopped")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping proxy launcher: $e")
             }
-        } ?: run {
-            launcher = null
         }
+
+        proxyJob?.cancel()
+        proxyJob = null
     }
 
+    @Synchronized
     private fun stopVpnService() {
         Log.d(TAG, "Stopping VPN service")
-        
-        // Set stopping flag first to prevent race conditions
-        vpnIsRunning.set(false)
-        
-        // Cancel VPN job first
+
+        vpnStopSignal?.complete(Unit)
+        vpnStopSignal = null
+
         vpnJob?.cancel()
-        
-        // Stop engine
+        vpnJob = null
+
+        // Snapshot references and null the fields BEFORE closing.
+        // This makes the function idempotent: a concurrent or repeated call
+        // will get null for both fields and skip the close entirely,
+        // preventing the fdsan double-close SIGABRT.
+        val eng = engine;       engine = null
+        val iface = vpnInterface; vpnInterface = null
+
         try {
-            engine?.let {
-                // Note: Engine.stop() method might not be available
-                engine!!.stop()
-                Log.d(TAG, "VPN engine stopped")
-                engine = null
-            }
+            eng?.stop()
+            Log.d(TAG, "VPN engine stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping engine: $e")
         }
-        
-        // Close VPN interface
+
         try {
-            vpnInterface?.close()
+            iface?.close()
         } catch (e: Exception) {
             Log.e(TAG, "Error closing VPN interface: $e")
-        } finally {
-            vpnInterface = null
         }
     }
 
@@ -448,22 +497,16 @@ class UnifiedVPNService : VpnService() {
             return
         }
 
-        // Stop services asynchronously to avoid blocking
+        // VPN stop is quick (closes fd + cancels job)
         stopVpnService()
-        stopProxyService()
 
-        // Schedule service shutdown to ensure it happens even if cleanup takes time
-        serviceScope?.launch {
-            try {
-                // Give a brief moment for cleanup, but don't wait too long
-                kotlinx.coroutines.delay(500) // 0.5 second max wait
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during service shutdown delay: $e")
-            } finally {
-                withContext(Dispatchers.Main) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                }
+        // Proxy stop (launcher.stop()) may block briefly while Go tears down connections.
+        // Dispatch to background so the UI/binder thread is not stalled.
+        serviceScope?.launch(Dispatchers.IO) {
+            stopProxyService()
+            withContext(NonCancellable + Dispatchers.Main) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
         }
     }
@@ -526,11 +569,11 @@ class UnifiedVPNService : VpnService() {
     }
 
     fun isVpnRunning(): Boolean {
-        return isServiceRunning && vpnIsRunning.get()
+        return isServiceRunning && vpnStopSignal != null
     }
 
     fun isRunning(): Boolean {
-        return isServiceRunning && (proxyIsRunning.get() || vpnIsRunning.get())
+        return isServiceRunning && (proxyIsRunning.get() || vpnStopSignal != null)
     }
 
     @SuppressLint("WakelockTimeout")

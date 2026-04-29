@@ -69,6 +69,14 @@ class LogsViewModel : ViewModel() {
                         }
                     }
                 } catch (e: Exception) {
+                    // When stopLogCollection() is called, it cancels the job (sets isActive=false)
+                    // then destroys the logcat process. Destroying the process closes the stream
+                    // while readLine() is blocked on it, throwing InterruptedIOException.
+                    // This is expected shutdown behaviour — do not surface it as an error.
+                    if (!isActive) {
+                        Log.d(TAG, "Log collection stopped (stream closed during shutdown)")
+                        return@withContext
+                    }
                     Log.e(TAG, "Error reading logcat", e)
                     val errorMsg = "Error reading logs: ${e.message}\n"
                     logBuffer.append(errorMsg)

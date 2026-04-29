@@ -95,7 +95,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             Settings(ctx).saveConfiguration(cfg)
             Toast.makeText(ctx, "Configuration imported successfully", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Log.e(TAG, "Import failed - clip: $clip, error: $e")
+            Log.e(TAG, "Import failed: $e")
             Toast.makeText(ctx, "Failed to parse configuration: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }

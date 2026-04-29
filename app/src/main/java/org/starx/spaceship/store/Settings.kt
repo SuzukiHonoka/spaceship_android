@@ -130,6 +130,7 @@ class Settings(private val ctx: Context) {
     fun saveConfiguration(cfg: Configuration) {
         //val outer = Json.decodeFromString(Configuration.serializer(), "")
         val d = cfg.serverAddress.lastIndexOf(':')
+        require(d != -1) { "Invalid server address format (missing port): ${cfg.serverAddress}" }
         server = cfg.serverAddress.take(d)
         serverPort = cfg.serverAddress.substring(d + 1).toInt()
         sni = cfg.host
@@ -156,19 +157,15 @@ class Settings(private val ctx: Context) {
             if (bypassOpt.isNotBlank()) {
                 if (bypassOpt.contains("lan")) add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
                 if (bypassOpt.contains("cn")) {
-                    add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.apply {
-                        src = listOf("\\S*\\.cn")
-                    })
-                    add(BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.apply {
-                        path = "${ctx.filesDir}/${Resource.OPT_ASSET_CHINALIST}"
-                    })
-                    add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.apply {
-                        path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4}"
-                    })
+                    // Use .copy() — BuiltinRoute enum values hold singleton Route instances.
+                    // .apply { } would mutate the shared singleton permanently, and when IPv6 is
+                    // enabled both the v4 and v6 CIDR routes would reference the same object,
+                    // causing the v4 route to be silently overwritten by the v6 path.
+                    add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.copy(src = listOf("\\S*\\.cn")))
+                    add(BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.copy(path = "${ctx.filesDir}/${Resource.OPT_ASSET_CHINALIST}"))
+                    add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.copy(path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4}"))
                     if (enableIpv6) {
-                        add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.apply {
-                            path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6}"
-                        })
+                        add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.copy(path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6}"))
                     }
                 }
             }

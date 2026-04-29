@@ -35,7 +35,10 @@ class LogsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         logsViewModel =
-            ViewModelProvider(this)[LogsViewModel::class.java]
+            // Use activity scope so HomeFragment and LogsFragment share the same instance.
+            // HomeFragment clears logs (setLogs("")) on service start; with fragment scope
+            // that call would target a different ViewModel and the logs screen wouldn't clear.
+            ViewModelProvider(requireActivity())[LogsViewModel::class.java]
         _binding = FragmentLogsBinding.inflate(inflater, container, false)
         val root: View = binding.root
         logsView = binding.logsText
@@ -90,11 +93,11 @@ class LogsFragment : Fragment() {
         super.onStart()
         // Start log collection when fragment is visible
         Log.i(TAG, "Starting log collection")
-        
-        // Reset tracking when fragment starts
-        lastDisplayedLength = 0
+        // Do NOT reset lastDisplayedLength here — the TextView still has its content.
+        // Resetting the counter without clearing the view causes all buffered logs
+        // to be re-appended on every resume, duplicating the displayed text.
+        // lastDisplayedLength is reset in onCreateView when the view is fresh.
         autoScrolling = true
-        
         logsViewModel.startLogCollection(TAG_LOGS)
     }
 

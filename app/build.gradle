@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = 'org.starx.spaceship'
-    compileSdk 37
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "org.starx.spaceship"
         minSdk = 29
         targetSdk = 37
-        versionCode = 171
-        versionName = '1.7.1'
+        versionCode = 172
+        versionName = '1.7.2'
         ndk {
             abiFilters.add("arm64-v8a")
         }

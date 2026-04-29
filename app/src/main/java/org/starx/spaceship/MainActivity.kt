@@ -26,7 +26,6 @@ import org.starx.spaceship.databinding.ActivityMainBinding
 import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.util.Resource
 import org.starx.spaceship.util.Resource.Companion.TAG
-import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
 
@@ -128,7 +127,7 @@ class MainActivity : AppCompatActivity() {
                     // Update version only after successful extraction
                     runtime.resourceVersion = Resource.VERSION
                     Log.i(TAG, "extract version: ${Resource.VERSION} done")
-                } catch (e: IOException) {
+                } catch (e: Exception) {
                     Log.e(TAG, "extract resource failed: $e")
                     // Don't update version if extraction failed
                 }
@@ -141,21 +140,19 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
-        buildSet {
+        val missing = buildList {
             add(android.Manifest.permission.POST_NOTIFICATIONS)
             add(android.Manifest.permission.QUERY_ALL_PACKAGES)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
             }
-        }.forEach { permission ->
-            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(
-                    applicationContext,
-                    "Missing permission: $permission, requesting..",
-                    Toast.LENGTH_SHORT
-                ).show()
-                requestPermissions(arrayOf(permission), 1)
-            }
+        }.filter { permission ->
+            checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missing.isNotEmpty()) {
+            // Request all missing permissions in a single call so Android shows one dialog.
+            requestPermissions(missing.toTypedArray(), 1)
         }
     }
 
