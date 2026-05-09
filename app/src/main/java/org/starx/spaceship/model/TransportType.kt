@@ -1,6 +1,8 @@
 package org.starx.spaceship.model
 
-enum class TransportType(val type: String) {
+enum class TransportType(
+    val type: String,
+) {
     TYPE_DIRECT("direct"),
-    TYPE_PROXY("proxy")
+    TYPE_PROXY("proxy"),
 }

@@ -28,7 +28,6 @@ import org.starx.spaceship.util.Resource
 import org.starx.spaceship.util.Resource.Companion.TAG
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,11 +42,14 @@ class MainActivity : AppCompatActivity() {
         val navController = navHostFragment.navController
         // Passing each menu ID as a set of Ids because each
         // menu should be considered as top level destinations.
-        val appBarConfiguration = AppBarConfiguration(
-            setOf(
-                R.id.navigation_home, R.id.navigation_dashboard, R.id.navigation_logs
+        val appBarConfiguration =
+            AppBarConfiguration(
+                setOf(
+                    R.id.navigation_home,
+                    R.id.navigation_dashboard,
+                    R.id.navigation_logs,
+                ),
             )
-        )
         setupActionBarWithNavController(navController, appBarConfiguration)
         navView.setupWithNavController(navController)
 
@@ -66,18 +68,19 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
-        grantResults: IntArray
+        grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         if (grantResults.isEmpty()) return
         if (requestCode == 1) {
             val granted = grantResults.first() == PackageManager.PERMISSION_GRANTED
-            Toast.makeText(
-                applicationContext,
-                "Notification permission is ${if (granted) "" else "not "}granted",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast
+                .makeText(
+                    applicationContext,
+                    "Notification permission is ${if (granted) "" else "not "}granted",
+                    Toast.LENGTH_SHORT,
+                ).show()
         }
     }
 
@@ -90,24 +93,26 @@ class MainActivity : AppCompatActivity() {
         showActionDialog(
             title = "Battery Optimization",
             message = "This app requires ignoring battery optimization to function properly. Please allow it.",
-            onPositive = { openBatteryOptimizationSettings() }
+            onPositive = { openBatteryOptimizationSettings() },
         )
     }
 
     @SuppressLint("BatteryLife")
     private fun openBatteryOptimizationSettings() {
-        val intent = Intent().apply {
-            action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-            data = "package:$packageName".toUri()
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
+        val intent =
+            Intent().apply {
+                action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                data = "package:$packageName".toUri()
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
         startActivity(intent)
 
-        Toast.makeText(
-            applicationContext,
-            "Please allow ignoring battery optimization for this app in settings",
-            Toast.LENGTH_LONG
-        ).show()
+        Toast
+            .makeText(
+                applicationContext,
+                "Please allow ignoring battery optimization for this app in settings",
+                Toast.LENGTH_LONG,
+            ).show()
     }
 
     private fun firstRunResourceExtraction() {
@@ -119,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         val resVersion = runtime.resourceVersion
         if (resVersion < Resource.VERSION) {
             Log.i(TAG, "current res version: $resVersion extract: ${Resource.VERSION}")
-            
+
             // Use lifecycle-aware coroutines for better resource management
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
@@ -140,15 +145,16 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun checkAndRequestPermission() {
-        val missing = buildList {
-            add(android.Manifest.permission.POST_NOTIFICATIONS)
-            add(android.Manifest.permission.QUERY_ALL_PACKAGES)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
+        val missing =
+            buildList {
+                add(android.Manifest.permission.POST_NOTIFICATIONS)
+                add(android.Manifest.permission.QUERY_ALL_PACKAGES)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    add(android.Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE)
+                }
+            }.filter { permission ->
+                checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED
             }
-        }.filter { permission ->
-            checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED
-        }
 
         if (missing.isNotEmpty()) {
             // Request all missing permissions in a single call so Android shows one dialog.
@@ -167,15 +173,20 @@ class MainActivity : AppCompatActivity() {
                 // Data Saver is OFF - app can use background data
                 true
             }
+
             ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED -> {
                 // Data Saver is ON but app is whitelisted (unrestricted)
                 true
             }
+
             ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED -> {
                 // Data Saver is ON and app is restricted
                 false
             }
-            else -> false
+
+            else -> {
+                false
+            }
         }
     }
 
@@ -187,34 +198,42 @@ class MainActivity : AppCompatActivity() {
 
         showActionDialog(
             title = "Unrestricted Mobile Data Usage",
-            message = "This app's background data usage is restricted. To ensure proper functionality, please allow unrestricted data access.",
-            onPositive = { openIgnoreBackgroundDataRestrictionsSettings() }
+            message =
+                "This app's background data usage is restricted. " +
+                    "To ensure proper functionality, please allow unrestricted data access.",
+            onPositive = { openIgnoreBackgroundDataRestrictionsSettings() },
         )
     }
 
     private fun openIgnoreBackgroundDataRestrictionsSettings() {
-        val intent = Intent().apply {
-            action = Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS
-            data = "package:$packageName".toUri()
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
+        val intent =
+            Intent().apply {
+                action = Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS
+                data = "package:$packageName".toUri()
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
         startActivity(intent)
 
-        Toast.makeText(
-            applicationContext,
-            "Please allow unrestricted mobile data usage for this app in settings",
-            Toast.LENGTH_LONG
-        ).show()
+        Toast
+            .makeText(
+                applicationContext,
+                "Please allow unrestricted mobile data usage for this app in settings",
+                Toast.LENGTH_LONG,
+            ).show()
     }
 
-    private fun showActionDialog(title: String, message: String, onPositive: () -> Unit) {
-        AlertDialog.Builder(this)
+    private fun showActionDialog(
+        title: String,
+        message: String,
+        onPositive: () -> Unit,
+    ) {
+        AlertDialog
+            .Builder(this)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton("OK") { _, _ ->
                 onPositive()
-            }
-            .setNegativeButton("Not Now", null)
+            }.setNegativeButton("Not Now", null)
             .show()
     }
 }

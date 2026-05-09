@@ -37,78 +37,80 @@ class LogsViewModel : ViewModel() {
             return
         }
 
-        collectJob = viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val logBuffer = StringBuilder()
-                var reader: BufferedReader? = null
-                
-                try {
-                    val command = tag?.let {
-                        arrayOf("/system/bin/logcat", "-v", "time", "-T", "1", "-s", it)
-                    } ?: arrayOf("/system/bin/logcat", "-v", "time", "-T", "1")
+        collectJob =
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    val logBuffer = StringBuilder()
+                    var reader: BufferedReader? = null
 
-                    logProcess = Runtime.getRuntime().exec(command)
-                    reader = BufferedReader(InputStreamReader(logProcess!!.inputStream))
+                    try {
+                        val command =
+                            tag?.let {
+                                arrayOf("/system/bin/logcat", "-v", "time", "-T", "1", "-s", it)
+                            } ?: arrayOf("/system/bin/logcat", "-v", "time", "-T", "1")
 
-                    var line: String?
-                    while (isActive && logProcess?.isAlive == true) {
-                        line = reader.readLine()
-                        line?.let {
-                            logBuffer.append(it).append("\n")
+                        logProcess = Runtime.getRuntime().exec(command)
+                        reader = BufferedReader(InputStreamReader(logProcess!!.inputStream))
 
-                            // Prevent buffer from growing too large
-                            if (logBuffer.length > MAX_BUFFER_SIZE) {
-                                val newStart = logBuffer.length - TRIM_TO_SIZE
-                                logBuffer.delete(0, newStart)
-                                logBuffer.insert(0, "... (log truncated) ...\n")
-                            }
+                        var line: String?
+                        while (isActive && logProcess?.isAlive == true) {
+                            line = reader.readLine()
+                            line?.let {
+                                logBuffer.append(it).append("\n")
 
-                            withContext(Dispatchers.Main) {
-                                _logs.value = logBuffer.toString()
+                                // Prevent buffer from growing too large
+                                if (logBuffer.length > MAX_BUFFER_SIZE) {
+                                    val newStart = logBuffer.length - TRIM_TO_SIZE
+                                    logBuffer.delete(0, newStart)
+                                    logBuffer.insert(0, "... (log truncated) ...\n")
+                                }
+
+                                withContext(Dispatchers.Main) {
+                                    _logs.value = logBuffer.toString()
+                                }
                             }
                         }
-                    }
-                } catch (e: Exception) {
-                    // When stopLogCollection() is called, it cancels the job (sets isActive=false)
-                    // then destroys the logcat process. Destroying the process closes the stream
-                    // while readLine() is blocked on it, throwing InterruptedIOException.
-                    // This is expected shutdown behaviour — do not surface it as an error.
-                    if (!isActive) {
-                        Log.d(TAG, "Log collection stopped (stream closed during shutdown)")
-                        return@withContext
-                    }
-                    Log.e(TAG, "Error reading logcat", e)
-                    val errorMsg = "Error reading logs: ${e.message}\n"
-                    logBuffer.append(errorMsg)
+                    } catch (e: Exception) {
+                        // When stopLogCollection() is called, it cancels the job (sets isActive=false)
+                        // then destroys the logcat process. Destroying the process closes the stream
+                        // while readLine() is blocked on it, throwing InterruptedIOException.
+                        // This is expected shutdown behavior — do not surface it as an error.
+                        if (!isActive) {
+                            Log.d(TAG, "Log collection stopped (stream closed during shutdown)")
+                            return@withContext
+                        }
+                        Log.e(TAG, "Error reading logcat", e)
+                        val errorMsg = "Error reading logs: ${e.message}\n"
+                        logBuffer.append(errorMsg)
 
-                    withContext(Dispatchers.Main) {
-                        _logs.value = logBuffer.toString()
+                        withContext(Dispatchers.Main) {
+                            _logs.value = logBuffer.toString()
+                        }
+                    } finally {
+                        try {
+                            reader?.close()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error closing reader", e)
+                        }
+
+                        try {
+                            logProcess?.destroy()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error destroying process", e)
+                        }
+                        logProcess = null
                     }
-                } finally {
-                    try {
-                        reader?.close()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Error closing reader", e)
-                    }
-                    
-                    try {
-                        logProcess?.destroy()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Error destroying process", e)
-                    }
-                    logProcess = null
                 }
             }
-        }
     }
 
     fun stopLogCollection() {
         Log.d(TAG, "Stopping log collection")
-        
+
         // Cancel the collection job
         collectJob?.cancel()
         collectJob = null
-        
+
         // Stop and cleanup the logcat process
         try {
             logProcess?.destroy()
@@ -117,7 +119,7 @@ class LogsViewModel : ViewModel() {
         } finally {
             logProcess = null
         }
-        
+
         // Clear logs
         _logs.value = ""
     }

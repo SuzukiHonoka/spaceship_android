@@ -3,6 +3,8 @@ package org.starx.spaceship.service
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.net.InetAddresses
 import android.net.IpPrefix
 import android.net.VpnService
 import android.os.Binder
@@ -39,13 +41,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 @SuppressLint("VpnServicePolicy")
 class UnifiedVPNService : VpnService() {
     private val binder = LocalBinder()
-    
+
     // Proxy (SOCKS5) server state
     // AtomicBoolean fields are inherently thread-safe — use val, the reference never changes.
     private val proxyIsRunning = AtomicBoolean(false)
     private val proxyIsFailed = AtomicBoolean(false)
+
     // These are written/read from different threads — @Volatile for visibility.
     @Volatile private var proxyJob: Job? = null
+
     @Volatile private var launcher: spaceship_aar.LauncherWrapper? = null
     private var launcherConfig: String? = null
 
@@ -53,18 +57,24 @@ class UnifiedVPNService : VpnService() {
     // vpnStopSignal is the single source of truth: created when VPN starts, completed
     // (from any thread) when we want the VPN job to stop. No polling needed.
     @Volatile private var vpnStopSignal: CompletableDeferred<Unit>? = null
+
     @Volatile private var vpnJob: Job? = null
+
     // Written by the VPN coroutine (IO), read/nulled by stopVpnService (any thread).
     @Volatile private var vpnInterface: ParcelFileDescriptor? = null
+
     @Volatile private var engine: spaceship_aar.Engine? = null
-    
+
     // Service configuration
     private var socksPort: Int = 10818
     private var enableRemoteDns: Boolean = true
     private var enableIpv6: Boolean = false
     private var bypassRule: String? = null
     private var enableVpnMode: Boolean = false
-    
+
+    /** DNS listen port, assigned dynamically from a free-port check on each service start. */
+    private var localDnsPort: Int = 58632
+
     // Common resources
     private var serviceScope: CoroutineScope? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -75,7 +85,7 @@ class UnifiedVPNService : VpnService() {
         const val CHANNEL_ID = "SpaceshipUnified"
         const val CHANNEL_NAME = "Spaceship VPN Service"
         const val NOTIFICATION_ID = 1
-        
+
         @Volatile
         var isServiceRunning = false
             private set
@@ -110,19 +120,23 @@ class UnifiedVPNService : VpnService() {
         Log.i(TAG, "onCreate")
 
         // Create notification channel
-        ServiceUtil.createNotificationChannel(applicationContext, CHANNEL_ID, CHANNEL_NAME)
+        ServiceUtil.createNotificationChannel(this, CHANNEL_ID, CHANNEL_NAME)
 
         // Set service running status
         isServiceRunning = true
-        
+
         // Initialize coroutine scope — SupervisorJob ensures one child failure
         // doesn't cancel sibling jobs (proxy vs VPN are independent)
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         Log.d(TAG, "onStartCommand")
-        
+
         if (intent == null) {
             Log.d(TAG, "intent is null")
             return START_NOT_STICKY
@@ -135,26 +149,32 @@ class UnifiedVPNService : VpnService() {
         enableIpv6 = intent.getBooleanExtra("ipv6", false)
         bypassRule = intent.getStringExtra("bypass")
         enableVpnMode = intent.getBooleanExtra("vpn_mode", false)
+        localDnsPort = intent.getIntExtra("dns_port", 58632)
 
         // Validate configuration
         if (launcherConfig.isNullOrEmpty()) {
             Log.e(TAG, "Invalid launcher config")
             return START_NOT_STICKY
         }
-        
+
         if (socksPort !in 1..65535) {
             Log.e(TAG, "Invalid SOCKS port: $socksPort")
             return START_NOT_STICKY
         }
 
         // Start foreground service with unified notification
-        val notificationText = if (enableVpnMode) {
-            "VPN and Proxy Service running"
+        val notificationText =
+            if (enableVpnMode) {
+                "VPN and Proxy Service running"
+            } else {
+                "Proxy Service running"
+            }
+        val notification = ServiceUtil.buildNotification(this, CHANNEL_ID, notificationText)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
-            "Proxy Service running"
+            startForeground(NOTIFICATION_ID, notification)
         }
-        val notification = ServiceUtil.buildNotification(applicationContext, CHANNEL_ID, notificationText)
-        startForeground(NOTIFICATION_ID, notification)
 
         // Stop any previously running services (e.g., unexpected system restart of a sticky
         // service). On a clean first start nothing is running — skip the lock overhead.
@@ -165,17 +185,17 @@ class UnifiedVPNService : VpnService() {
 
         // Start proxy service (always needed)
         startProxyService()
-        
+
         // Start VPN service if enabled
         if (enableVpnMode) {
             startVpnService()
         }
-        
+
         acquireWakeLock()
-        
+
         val message = if (enableVpnMode) "VPN Service started" else "Proxy Service started"
         Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
-        
+
         return START_STICKY
     }
 
@@ -183,46 +203,51 @@ class UnifiedVPNService : VpnService() {
         if (launcherConfig.isNullOrEmpty()) return
 
         if (proxyIsRunning.compareAndSet(false, true)) {
-            proxyJob = serviceScope?.launch {
-                Log.d(TAG, "Starting proxy service (config length: ${launcherConfig?.length})")
-                // Capture whether we exited naturally (not via cancellation / explicit stop)
-                val selfStopped: Boolean
-                try {
-                    launcher = spaceship_aar.Spaceship_aar.newLauncher()
-                    launcher!!.launchFromString(launcherConfig)  // blocks until Go exits or Stop() is called
-                    // proxyIsRunning is set to false by stopProxyService() BEFORE launcher.stop()
-                    // unblocks launchFromString. So if it's still true here, Go exited on its own.
-                    // (We cannot use isActive: cancel() is called AFTER stop(), so isActive is
-                    //  still true at this point even during an explicit stop.)
-                    selfStopped = proxyIsRunning.get()
-                } catch (e: Exception) {
-                    proxyIsFailed.set(true)
-                    Log.e(TAG, "Start proxy failed: ${e.message}")
+            proxyJob =
+                serviceScope?.launch {
+                    Log.d(TAG, "Starting proxy service (config length: ${launcherConfig?.length})")
+                    // Capture whether we exited naturally (not via cancellation / explicit stop)
+                    val selfStopped: Boolean
+                    try {
+                        launcher = spaceship_aar.Spaceship_aar.newLauncher()
+                        launcher!!.launchFromString(launcherConfig) // blocks until Go exits or Stop() is called
+                        // proxyIsRunning is set to false by stopProxyService() BEFORE launcher.stop()
+                        // unblocks launchFromString. So if it's still true here, Go exited on its own.
+                        // (We cannot use isActive: cancel() is called AFTER stop(), so isActive is
+                        //  still true at this point even during an explicit stop.)
+                        selfStopped = proxyIsRunning.get()
+                    } catch (e: Exception) {
+                        proxyIsFailed.set(true)
+                        Log.e(TAG, "Start proxy failed: ${e.message}")
+                        proxyIsRunning.set(false)
+                        return@launch
+                    }
+
+                    // Proxy service stopped
                     proxyIsRunning.set(false)
-                    return@launch
-                }
 
-                // Proxy service stopped
-                proxyIsRunning.set(false)
+                    val msg = "Proxy service exited ${
+                        if (proxyIsFailed.get()) {
+                            "with internal error"
+                        } else if (selfStopped) {
+                            "unexpectedly"
+                        } else {
+                            "normally"
+                        }
+                    }"
+                    Log.d(TAG, msg)
 
-                val msg = "Proxy service exited ${
-                    if (proxyIsFailed.get()) "with internal error"
-                    else if (selfStopped) "unexpectedly"
-                    else "normally"
-                }"
-                Log.d(TAG, msg)
-
-                // Use NonCancellable so cleanup runs even if coroutine was canceled
-                withContext(NonCancellable + Dispatchers.Main) {
-                    Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
-                    if (selfStopped) {
-                        // Proxy died on its own — bring everything down cleanly
-                        if (vpnStopSignal != null) stopVpnService()
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                        stopSelf()
+                    // Use NonCancellable so cleanup runs even if coroutine was canceled
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
+                        if (selfStopped) {
+                            // Proxy died on its own — bring everything down cleanly
+                            if (vpnStopSignal != null) stopVpnService()
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                            stopSelf()
+                        }
                     }
                 }
-            }
             return
         }
         Log.d(TAG, "Proxy service is already started.")
@@ -237,39 +262,40 @@ class UnifiedVPNService : VpnService() {
         val signal = CompletableDeferred<Unit>()
         vpnStopSignal = signal
 
-        vpnJob = serviceScope?.launch {
-            val tunFd: Int
-            try {
-                tunFd = buildTunnel()
-                startTun2socks(tunFd)
-            } catch (e: Exception) {
-                Log.e(TAG, "VPN service error: $e")
-                // VPN failed to start — tear everything down so the proxy doesn't
-                // keep running headless and the UI switch resets correctly.
-                stopVpnService()
-                stopProxyService()
-                withContext(NonCancellable + Dispatchers.Main) {
-                    Toast.makeText(applicationContext, "VPN error: $e", Toast.LENGTH_SHORT).show()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+        vpnJob =
+            serviceScope?.launch {
+                val tunFd: Int
+                try {
+                    tunFd = buildTunnel()
+                    startTun2socks(tunFd)
+                } catch (e: Exception) {
+                    Log.e(TAG, "VPN service error: $e")
+                    // VPN failed to start — tear everything down so the proxy doesn't
+                    // keep running headless and the UI switch resets correctly.
+                    stopVpnService()
+                    stopProxyService()
+                    withContext(NonCancellable + Dispatchers.Main) {
+                        Toast.makeText(applicationContext, "VPN error: $e", Toast.LENGTH_SHORT).show()
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
+                    return@launch
                 }
-                return@launch
-            }
 
-            // Suspend here until stopVpnService() fires the signal.
-            // No polling — zero CPU overhead, instant wakeup.
-            // Whoever fires the signal has already called stopVpnService() and
-            // is responsible for service lifecycle — do NOT call stopVpnService()
-            // again here or we double-close the VPN fd (fdsan SIGABRT).
-            signal.await()
-        }
+                // Suspend here until stopVpnService() fires the signal.
+                // No polling — zero CPU overhead, instant wakeup.
+                // Whoever fires the signal has already called stopVpnService() and
+                // is responsible for service lifecycle — do NOT call stopVpnService()
+                // again here or we double-close the VPN fd (fdsan SIGABRT).
+                signal.await()
+            }
     }
 
     private suspend fun buildTunnel(): Int {
         Log.i(TAG, "buildTunnel")
 
         // Check if VPN permission is granted
-        val vpnIntent = prepare(this)
+        val vpnIntent = prepare(applicationContext)
         if (vpnIntent != null) {
             Log.e(TAG, "VPN permission not granted")
             throw SecurityException("VPN permission required")
@@ -277,21 +303,23 @@ class UnifiedVPNService : VpnService() {
 
         val builder = Builder()
 
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent =
+            PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE,
+            )
 
-        val localTunnel = builder
-            .setSession("Spaceship VPN")
-            .setConfigureIntent(pendingIntent)
-            .setMetered(false)
-            .setMtu(1500)
-            .addAddress(TUNNEL_ADDRESS_IPV4, 24)
-            .addRoute("0.0.0.0", 0)
-            .addDisallowedApplication(packageName)
+        val localTunnel =
+            builder
+                .setSession("Spaceship VPN")
+                .setConfigureIntent(pendingIntent)
+                .setMetered(false)
+                .setMtu(1500)
+                .addAddress(TUNNEL_ADDRESS_IPV4, 24)
+                .addRoute("0.0.0.0", 0)
+                .addDisallowedApplication(applicationContext.packageName)
 
         val dnsServerSet = mutableSetOf(TUNNEL_DNS_IPV4_PRIMARY, TUNNEL_DNS_IPV4_SECONDARY)
         if (enableIpv6) {
@@ -333,7 +361,7 @@ class UnifiedVPNService : VpnService() {
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun applyBypassRules(builder: Builder) {
-        val cacheKey = "${bypassRule}|${enableIpv6}"
+        val cacheKey = "$bypassRule|$enableIpv6"
         val cached = ipPrefixCache
 
         val prefixes: List<IpPrefix>
@@ -352,14 +380,14 @@ class UnifiedVPNService : VpnService() {
                 fileList.forEach { filename ->
                     try {
                         Resource(applicationContext).getFile(filename).use { ins ->
-                            ins.bufferedReader().use { reader ->
-                                val lines = reader.readLines()
-                                Log.d(TAG, "parse file $filename, cidr count: ${lines.size}")
+                            ins.bufferedReader().useLines { lines ->
                                 lines.forEach { line ->
-                                    try {
-                                        list.add(parseCidrToIpPrefix(line))
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "parse cidr failed: $e")
+                                    if (line.isNotBlank()) {
+                                        try {
+                                            list.add(parseCidrToIpPrefix(line.trim()))
+                                        } catch (e: Exception) {
+                                            Log.e(TAG, "parse cidr failed for line '$line': $e")
+                                        }
                                     }
                                 }
                             }
@@ -402,7 +430,7 @@ class UnifiedVPNService : VpnService() {
         }
         val ipAddress = parts[0]
         val prefixLength = parts[1].toInt()
-        val inetAddress = InetAddress.getByName(ipAddress)
+        val inetAddress = InetAddresses.parseNumericAddress(ipAddress)
         return IpPrefix(inetAddress, prefixLength)
     }
 
@@ -419,7 +447,7 @@ class UnifiedVPNService : VpnService() {
         key.tcpReceiveBufferSize = ""
         key.tcpModerateReceiveBuffer = false
         key.udpDisabled = true
-        key.dnsAddr = if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else ""
+        key.dnsAddr = if (enableRemoteDns) "127.0.0.1:$localDnsPort" else ""
         Log.d(TAG, "Engine key: $key")
         engine = spaceship_aar.Engine()
         engine!!.insert(key)
@@ -427,6 +455,7 @@ class UnifiedVPNService : VpnService() {
         Log.d(TAG, "VPN Engine started")
     }
 
+    @Synchronized
     private fun stopProxyService() {
         Log.d(TAG, "Stopping proxy service")
         proxyIsRunning.set(false)
@@ -440,6 +469,7 @@ class UnifiedVPNService : VpnService() {
         launcher = null
         if (l != null) {
             try {
+                // Important: this might block briefly while Go cleans up.
                 l.stop()
                 Log.d(TAG, "Proxy launcher stopped")
             } catch (e: Exception) {
@@ -465,8 +495,10 @@ class UnifiedVPNService : VpnService() {
         // This makes the function idempotent: a concurrent or repeated call
         // will get null for both fields and skip the close entirely,
         // preventing the fdsan double-close SIGABRT.
-        val eng = engine;       engine = null
-        val iface = vpnInterface; vpnInterface = null
+        val eng = engine
+        engine = null
+        val iface = vpnInterface
+        vpnInterface = null
 
         try {
             eng?.stop()
@@ -484,16 +516,21 @@ class UnifiedVPNService : VpnService() {
 
     fun stopService(stopVpnOnly: Boolean = false) {
         Log.d(TAG, "stopService called - stopVpnOnly: $stopVpnOnly")
-        
+
         if (stopVpnOnly) {
             stopVpnService()
             // Update notification to reflect proxy-only mode
-            val notification = ServiceUtil.buildNotification(
-                applicationContext, 
-                CHANNEL_ID, 
-                "Proxy Service running"
-            )
-            startForeground(NOTIFICATION_ID, notification)
+            val notification =
+                ServiceUtil.buildNotification(
+                    this,
+                    CHANNEL_ID,
+                    "Proxy Service running",
+                )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
             return
         }
 
@@ -516,7 +553,7 @@ class UnifiedVPNService : VpnService() {
         Log.d(TAG, "onDestroy")
 
         isServiceRunning = false
-        
+
         // Stop services synchronously in onDestroy to ensure proper cleanup
         try {
             stopVpnService()
@@ -549,32 +586,34 @@ class UnifiedVPNService : VpnService() {
         super.onRevoke()
         Log.d(TAG, "onRevoke - VPN permission revoked")
         stopVpnService()
-        
+
         // Continue with proxy-only mode
-        val notification = ServiceUtil.buildNotification(
-            applicationContext, 
-            CHANNEL_ID, 
-            "Proxy Service running (VPN disabled)"
-        )
-        startForeground(NOTIFICATION_ID, notification)
+        val notification =
+            ServiceUtil.buildNotification(
+                this,
+                CHANNEL_ID,
+                "Proxy Service running (VPN disabled)",
+            )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
-    override fun onTimeout(startId: Int, fgsType: Int) {
+    override fun onTimeout(
+        startId: Int,
+        fgsType: Int,
+    ) {
         Toast.makeText(applicationContext, "Service max-run hour reached, shutting down..", Toast.LENGTH_SHORT).show()
         stopSelf()
     }
 
-    fun isProxyRunning(): Boolean {
-        return isServiceRunning && proxyIsRunning.get()
-    }
+    fun isProxyRunning(): Boolean = isServiceRunning && proxyIsRunning.get()
 
-    fun isVpnRunning(): Boolean {
-        return isServiceRunning && vpnStopSignal != null
-    }
+    fun isVpnRunning(): Boolean = isServiceRunning && vpnStopSignal != null
 
-    fun isRunning(): Boolean {
-        return isServiceRunning && (proxyIsRunning.get() || vpnStopSignal != null)
-    }
+    fun isRunning(): Boolean = isServiceRunning && (proxyIsRunning.get() || vpnStopSignal != null)
 
     @SuppressLint("WakelockTimeout")
     private fun acquireWakeLock() {
@@ -585,12 +624,13 @@ class UnifiedVPNService : VpnService() {
 
         Log.d(TAG, "Acquiring WakeLock")
         try {
-            wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).run {
-                newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
-                    setReferenceCounted(false)
-                    acquire()
+            wakeLock =
+                (getSystemService(POWER_SERVICE) as PowerManager).run {
+                    newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
+                        setReferenceCounted(false)
+                        acquire()
+                    }
                 }
-            }
             Log.d(TAG, "WakeLock acquired: $wakeLock")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to acquire WakeLock: $e")

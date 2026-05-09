@@ -6,8 +6,13 @@ import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import org.starx.spaceship.R
 
-class EditTextUtil(val et: EditTextPreference) {
-    fun setNumberOnly(start: Int = 0, end: Int = Int.MAX_VALUE): EditTextUtil {
+class EditTextUtil(
+    val et: EditTextPreference,
+) {
+    fun setNumberOnly(
+        start: Int = 0,
+        end: Int = Int.MAX_VALUE,
+    ): EditTextUtil {
         et.apply {
             setOnBindEditTextListener {
                 it.inputType = InputType.TYPE_CLASS_NUMBER
@@ -20,19 +25,23 @@ class EditTextUtil(val et: EditTextPreference) {
                 try {
                     value = (newValue as String).toInt()
                 } catch (_: java.lang.NumberFormatException) {
-                    Toast.makeText(
-                        context, "Invalid number",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast
+                        .makeText(
+                            context,
+                            "Invalid number",
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     return@setOnPreferenceChangeListener false
                 }
 
                 val isValid = (value in start..end)
                 if (!isValid) {
-                    Toast.makeText(
-                        context, "Invalid number range, should be $start..$end",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast
+                        .makeText(
+                            context,
+                            "Invalid number range, should be $start..$end",
+                            Toast.LENGTH_SHORT,
+                        ).show()
                 }
                 isValid
             }
@@ -54,26 +63,28 @@ class EditTextUtil(val et: EditTextPreference) {
     }
 
     private fun setMask(char: Char): EditTextUtil {
-        et.summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
-            val text = preference.text
-            if (text.isNullOrEmpty()) {
-                "Not set"
-            } else {
-                char.toString().repeat(text.length)
+        et.summaryProvider =
+            Preference.SummaryProvider<EditTextPreference> { preference ->
+                val text = preference.text
+                if (text.isNullOrEmpty()) {
+                    "Not set"
+                } else {
+                    char.toString().repeat(text.length)
+                }
             }
-        }
         return this
     }
 
     fun setSuffix(suffix: String): EditTextUtil {
-        et.summaryProvider = Preference.SummaryProvider<EditTextPreference> { preference ->
-            val text = preference.text
-            if (text.isNullOrEmpty()) {
-                "Not set"
-            } else {
-                "$text$suffix"
+        et.summaryProvider =
+            Preference.SummaryProvider<EditTextPreference> { preference ->
+                val text = preference.text
+                if (text.isNullOrEmpty()) {
+                    "Not set"
+                } else {
+                    "$text$suffix"
+                }
             }
-        }
         return this
     }
 }

@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
     id 'kotlinx-serialization'
 }
 
@@ -12,8 +11,8 @@ android {
         applicationId = "org.starx.spaceship"
         minSdk = 29
         targetSdk = 37
-        versionCode = 172
-        versionName = '1.7.2'
+        versionCode = 173
+        versionName = '1.7.3'
         ndk {
             abiFilters.add("arm64-v8a")
         }
@@ -55,7 +54,7 @@ android {
         includeInBundle = false
     }
     ndkVersion = '29.0.14206865'
-    compileSdkMinor 0
+    compileSdkMinor = 0
 }
 
 dependencies {

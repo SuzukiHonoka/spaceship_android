@@ -5,18 +5,18 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import org.starx.spaceship.R
 
-class Runtime(private val ctx: Context) {
-
+class Runtime(
+    private val ctx: Context,
+) {
     private val sp: SharedPreferences =
         ctx.getSharedPreferences(
             ctx.getString(R.string.preference_settings_key),
-            Context.MODE_PRIVATE
+            Context.MODE_PRIVATE,
         )
 
     var firstRun: Boolean
         get() = sp.getBoolean(ctx.getString(R.string.settings_first_run), true)
         set(value) = sp.edit { putBoolean(ctx.getString(R.string.settings_first_run), value) }
-
 
     var resourceVersion: Int
         get() = sp.getInt(ctx.getString(R.string.settings_resource_version), 0)

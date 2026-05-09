@@ -12,7 +12,9 @@ import org.starx.spaceship.util.Extractor
 import org.starx.spaceship.util.JsonFactory
 import org.starx.spaceship.util.Resource
 
-class Settings(private val ctx: Context) {
+class Settings(
+    private val ctx: Context,
+) {
     private val sp: SharedPreferences =
         ctx.getSharedPreferences(ctx.getString(R.string.root_preference_key), Context.MODE_PRIVATE)
 
@@ -109,26 +111,26 @@ class Settings(private val ctx: Context) {
         if (server.isBlank() || userID.isBlank()) {
             return false
         }
-        
+
         // Check port range
         if (serverPort !in 1..65535) {
             return false
         }
-        
+
         // Check local ports don't conflict and are valid
         if (socksPort !in 1..65535 || httpPort !in 1..65535) {
             return false
         }
-        
+
         if (socksPort == httpPort) {
             return false
         }
-        
+
         return true
     }
 
     fun saveConfiguration(cfg: Configuration) {
-        //val outer = Json.decodeFromString(Configuration.serializer(), "")
+        // val outer = Json.decodeFromString(Configuration.serializer(), "")
         val d = cfg.serverAddress.lastIndexOf(':')
         require(d != -1) { "Invalid server address format (missing port): ${cfg.serverAddress}" }
         server = cfg.serverAddress.take(d)
@@ -146,45 +148,57 @@ class Settings(private val ctx: Context) {
         idleTimeout = cfg.idleTimeout ?: 0
         enableIpv6 = cfg.ipv6
         allowOther = !(cfg.listenSocks.contains("127.0.0.1") && cfg.listenHttp.contains("127.0.0.1"))
-        //enableRemoteDns = cfg.listenDns != ""
-        //ca = cfg.cas
-        //routes = cfg.routes
+        // enableRemoteDns = cfg.listenDns != ""
+        // ca = cfg.cas
+        // routes = cfg.routes
     }
 
-    private fun toConfiguration(): Configuration {
+    private fun toConfiguration(dnsPort: Int? = null): Configuration {
         val bypassOpt = bypass
-        val routes = buildList {
-            if (bypassOpt.isNotBlank()) {
-                if (bypassOpt.contains("lan")) add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
-                if (bypassOpt.contains("cn")) {
-                    // Use .copy() — BuiltinRoute enum values hold singleton Route instances.
-                    // .apply { } would mutate the shared singleton permanently, and when IPv6 is
-                    // enabled both the v4 and v6 CIDR routes would reference the same object,
-                    // causing the v4 route to be silently overwritten by the v6 path.
-                    add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.copy(src = listOf("\\S*\\.cn")))
-                    add(BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.copy(path = "${ctx.filesDir}/${Resource.OPT_ASSET_CHINALIST}"))
-                    add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.copy(path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4}"))
-                    if (enableIpv6) {
-                        add(BuiltinRoute.ROUTE_BYPASS_CIDR.route.copy(path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6}"))
+        val routes =
+            buildList {
+                if (bypassOpt.isNotBlank()) {
+                    if (bypassOpt.contains("lan")) add(BuiltinRoute.ROUTE_BYPASS_LOCAL_CIDR.route)
+                    if (bypassOpt.contains("cn")) {
+                        // Use .copy() — BuiltinRoute enum values hold singleton Route instances.
+                        // .apply { } would mutate the shared singleton permanently, and when IPv6 is
+                        // enabled both the v4 and v6 CIDR routes would reference the same object,
+                        // causing the v4 route to be silently overwritten by the v6 path.
+                        add(BuiltinRoute.ROUTE_BYPASS_REGEX.route.copy(src = listOf("\\S*\\.cn")))
+                        add(
+                            BuiltinRoute.ROUTE_BYPASS_DOMAIN.route.copy(
+                                path = "${ctx.filesDir}/${Resource.OPT_ASSET_CHINALIST}",
+                            ),
+                        )
+                        add(
+                            BuiltinRoute.ROUTE_BYPASS_CIDR.route.copy(
+                                path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V4}",
+                            ),
+                        )
+                        if (enableIpv6) {
+                            add(
+                                BuiltinRoute.ROUTE_BYPASS_CIDR.route.copy(
+                                    path = "${ctx.filesDir}/${Resource.OPT_ASSET_CN_AGGREGATED_ZONE_V6}",
+                                ),
+                            )
+                        }
                     }
                 }
+                add(BuiltinRoute.ROUTE_DEFAULT.route)
             }
-            add(BuiltinRoute.ROUTE_DEFAULT.route)
-        }
-
 
         val bind = if (allowOther) "0.0.0.0" else "127.0.0.1"
         return Configuration(
-            "${server}:${serverPort}",
+            "$server:$serverPort",
             sni,
             serviceName,
             tls,
             mux,
             buffer,
             userID,
-            "${bind}:${socksPort}",
-            "${bind}:${httpPort}",
-            if (enableRemoteDns) TUNNEL_ADDRESS_IPV4_DNS else "",
+            "$bind:$socksPort",
+            "$bind:$httpPort",
+            if (enableRemoteDns) (dnsPort?.let { "127.0.0.1:$it" } ?: TUNNEL_ADDRESS_IPV4_DNS) else "",
             basicAuth.takeIf { it.isNotBlank() }?.let(::splitBasicAuth),
             DNS(dns),
             enableIpv6,
@@ -196,12 +210,13 @@ class Settings(private val ctx: Context) {
 
     private fun splitBasicAuth(s: String): List<String> {
         val authPattern = "^\\w+:\\w+$".toRegex()
-        return s.split(Regex("[\n,]"))
+        return s
+            .split(Regex("[\n,]"))
             .asSequence()
             .map(String::trim)
             .filter { it.isNotEmpty() && authPattern.matches(it) }
             .toList()
     }
 
-    fun toJson() = JsonFactory.processor.encodeToString(toConfiguration())
+    fun toJson(dnsPort: Int? = null) = JsonFactory.processor.encodeToString(toConfiguration(dnsPort))
 }

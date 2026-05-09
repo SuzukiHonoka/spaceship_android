@@ -14,10 +14,15 @@ data class WifiNetworkInfo(
     val ipAddresses: List<InetAddress>?, // Kept this from your original data class
 )
 
-class Connectivity(private val context: Context) {
+class Connectivity(
+    context: Context,
+) {
+    private val context = context.applicationContext
     private var wifiNetworkCallback: ConnectivityManager.NetworkCallback? = null
+
     // To store the latest capabilities and link properties for the current Wi-Fi network
     private var currentWifiNetwork: Network? = null
+
 //    private var currentWifiCapabilities: NetworkCapabilities? = null
     private var currentWifiLinkProperties: LinkProperties? = null
     private var listener: ((WifiNetworkInfo?) -> Unit)? = null
@@ -45,73 +50,82 @@ class Connectivity(private val context: Context) {
 //        currentWifiCapabilities = null
         currentWifiLinkProperties = null
 
-        val wifiNetworkRequest = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .build()
+        val wifiNetworkRequest =
+            NetworkRequest
+                .Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
 
-        wifiNetworkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                super.onAvailable(network)
-                // DO NOT call getNetworkCapabilities or getLinkProperties here.
-                // Store the network and wait for onCapabilitiesChanged / onLinkPropertiesChanged.
-                Log.d(TAG, "Wi-Fi network available (candidate): $network")
-                // We only care about the *first* Wi-Fi network that becomes available for this request session
-                if (!foundWifiForThisRequest) {
-                    currentWifiNetwork = network
-                }
-                // The actual processing will happen in onCapabilitiesChanged and onLinkPropertiesChanged
-            }
-
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                super.onCapabilitiesChanged(network, networkCapabilities)
-
-                // Only proceed if this is the Wi-Fi network we are tracking for this request
-                if (network != currentWifiNetwork) {
-                    Log.w(TAG, "Capabilities changed for an unexpected network: $network. Current target: $currentWifiNetwork")
-                    return // Ignore changes for networks we are not tracking
+        wifiNetworkCallback =
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    super.onAvailable(network)
+                    // DO NOT call getNetworkCapabilities or getLinkProperties here.
+                    // Store the network and wait for onCapabilitiesChanged / onLinkPropertiesChanged.
+                    Log.d(TAG, "Wi-Fi network available (candidate): $network")
+                    // We only care about the *first* Wi-Fi network that becomes available for this request session
+                    if (!foundWifiForThisRequest) {
+                        currentWifiNetwork = network
+                    }
+                    // The actual processing will happen in onCapabilitiesChanged and onLinkPropertiesChanged
                 }
 
-                // Check if it is actually a Wi-Fi network.
-                val hasTransportWifi = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                Log.d(TAG, "Wi-Fi capabilities changed for $network. Has TRANSPORT_WIFI: $hasTransportWifi")
-                if (hasTransportWifi) {
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    networkCapabilities: NetworkCapabilities,
+                ) {
+                    super.onCapabilitiesChanged(network, networkCapabilities)
+
+                    // Only proceed if this is the Wi-Fi network we are tracking for this request
+                    if (network != currentWifiNetwork) {
+                        Log.w(TAG, "Capabilities changed for an unexpected network: $network. Current target: $currentWifiNetwork")
+                        return // Ignore changes for networks we are not tracking
+                    }
+
+                    // Check if it is actually a Wi-Fi network.
+                    val hasTransportWifi = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    Log.d(TAG, "Wi-Fi capabilities changed for $network. Has TRANSPORT_WIFI: $hasTransportWifi")
+                    if (hasTransportWifi) {
 //                    currentWifiCapabilities = networkCapabilities
 //                    // If LinkProperties are already available, try to process.
 //                    // Otherwise, wait for onLinkPropertiesChanged.
 //                    currentWifiLinkProperties?.let { props ->
 //                        processWifiNetworkUpdate(network, networkCapabilities, props)
 //                    }
-                    return
+                        return
+                    }
+
+                    // It was our network, but it's no longer Wi-Fi (highly unlikely, but good to handle)
+                    clearCurrentWifiStateAndNotify()
                 }
 
-                // It was our network, but it's no longer Wi-Fi (highly unlikely, but good to handle)
-                clearCurrentWifiStateAndNotify()
-            }
-
-            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-                super.onLinkPropertiesChanged(network, linkProperties)
-                Log.d(TAG, "Wi-Fi link properties changed for $network")
-                // Only proceed if this is the Wi-Fi network we are tracking.
-                if (network == currentWifiNetwork) {
-                    currentWifiLinkProperties = linkProperties
-                    // If Capabilities are already available, try to process.
-                    // Otherwise, wait for onCapabilitiesChanged.
+                override fun onLinkPropertiesChanged(
+                    network: Network,
+                    linkProperties: LinkProperties,
+                ) {
+                    super.onLinkPropertiesChanged(network, linkProperties)
+                    Log.d(TAG, "Wi-Fi link properties changed for $network")
+                    // Only proceed if this is the Wi-Fi network we are tracking.
+                    if (network == currentWifiNetwork) {
+                        currentWifiLinkProperties = linkProperties
+                        // If Capabilities are already available, try to process.
+                        // Otherwise, wait for onCapabilitiesChanged.
 //                    currentWifiCapabilities?.let { caps ->
 //                        processWifiNetworkUpdate(network, caps, linkProperties)
 //                    }
-                    processWifiNetworkUpdate(network, linkProperties)
+                        processWifiNetworkUpdate(network, linkProperties)
+                    }
                 }
-            }
 
-            override fun onLost(network: Network) {
-                super.onLost(network)
-                Log.d(TAG, "Wi-Fi network lost: $network")
-                if (network == currentWifiNetwork) {
-                    // The specific Wi-Fi network we were reporting was lost
-                    clearCurrentWifiStateAndNotify()
+                override fun onLost(network: Network) {
+                    super.onLost(network)
+                    Log.d(TAG, "Wi-Fi network lost: $network")
+                    if (network == currentWifiNetwork) {
+                        // The specific Wi-Fi network we were reporting was lost
+                        clearCurrentWifiStateAndNotify()
+                    }
                 }
             }
-        }
 
         connectivityManager.registerNetworkCallback(wifiNetworkRequest, wifiNetworkCallback!!)
         Log.d(TAG, "Registered Wi-Fi network callback.")
@@ -119,7 +133,7 @@ class Connectivity(private val context: Context) {
 
     private fun processWifiNetworkUpdate(
         network: Network,
-        linkProperties: LinkProperties
+        linkProperties: LinkProperties,
     ) {
         // Ensure we only process and call the listener once per discoverWifiNetworkInfo call
         if (foundWifiForThisRequest) {
@@ -147,8 +161,7 @@ class Connectivity(private val context: Context) {
             }
         }
 
-
-        Log.d(TAG, "Wi-Fi Info: IPs=${wifiIpAddresses}")
+        Log.d(TAG, "Wi-Fi Info: IPs=$wifiIpAddresses")
         listener?.invoke(WifiNetworkInfo(ipAddresses = wifiIpAddresses.toList()))
     }
 

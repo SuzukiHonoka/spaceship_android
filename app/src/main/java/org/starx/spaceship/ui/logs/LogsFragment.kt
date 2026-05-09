@@ -13,16 +13,13 @@ import org.starx.spaceship.databinding.FragmentLogsBinding
 
 class LogsFragment : Fragment() {
     private var _binding: FragmentLogsBinding? = null
+    val binding get() = _binding!!
 
     private lateinit var logsViewModel: LogsViewModel
     private lateinit var logsView: TextView
     private lateinit var logScroll: ScrollView
-
-    // This property is only valid between onCreateView and
-    // onDestroyView.
-    private val binding get() = _binding!!
     private var autoScrolling = true
-    private var lastDisplayedLength = 0  // Track what's already displayed
+    private var lastDisplayedLength = 0 // Track what's already displayed
 
     companion object {
         const val TAG = "LogsFragment"
@@ -32,7 +29,7 @@ class LogsFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         logsViewModel =
             // Use activity scope so HomeFragment and LogsFragment share the same instance.
@@ -43,12 +40,12 @@ class LogsFragment : Fragment() {
         val root: View = binding.root
         logsView = binding.logsText
         logScroll = binding.logsScroll
-        
+
         logsView.setOnClickListener {
             autoScrolling = false
             Log.i(TAG, "autoScrolling disabled")
         }
-        
+
         // Double tap to re-enable auto scrolling
         logsView.setOnLongClickListener {
             autoScrolling = true
@@ -77,7 +74,7 @@ class LogsFragment : Fragment() {
                 lastDisplayedLength = logs.length
             }
             // If logs.length == lastDisplayedLength, no change needed
-            
+
             if (autoScrolling) {
                 logScroll.post {
                     logScroll.fullScroll(View.FOCUS_DOWN)

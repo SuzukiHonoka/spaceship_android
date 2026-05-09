@@ -25,6 +25,7 @@ import org.starx.spaceship.store.Runtime
 import org.starx.spaceship.store.Settings
 import org.starx.spaceship.ui.logs.LogsViewModel
 import org.starx.spaceship.util.Resource
+import org.starx.spaceship.util.ServiceUtil
 import spaceship_aar.Spaceship_aar
 
 class HomeFragment : Fragment() {
@@ -36,105 +37,123 @@ class HomeFragment : Fragment() {
         const val TAG = "Home"
     }
 
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            Log.d(TAG, "Unified Service Connected")
-            try {
-                val binder = service as? UnifiedVPNService.LocalBinder
-                binder?.let {
-                    unifiedService = it.getService()
-                    isServiceBound = true
-                    setRunning()
-                } ?: run {
-                    Log.e(TAG, "Failed to cast service binder")
+    private val serviceConnection =
+        object : ServiceConnection {
+            override fun onServiceConnected(
+                name: ComponentName?,
+                service: IBinder?,
+            ) {
+                Log.d(TAG, "Unified Service Connected")
+                try {
+                    val binder = service as? UnifiedVPNService.LocalBinder
+                    binder?.let {
+                        unifiedService = it.getService()
+                        isServiceBound = true
+                        setRunning()
+                    } ?: run {
+                        Log.e(TAG, "Failed to cast service binder")
+                        setNotRunning()
+                    }
+                } catch (e: ClassCastException) {
+                    Log.e(TAG, "Failed to cast service binder", e)
                     setNotRunning()
                 }
-            } catch (e: ClassCastException) {
-                Log.e(TAG, "Failed to cast service binder", e)
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                Log.d(TAG, "Unified Service Disconnected")
+                unifiedService = null
+                isServiceBound = false
                 setNotRunning()
             }
         }
 
-        override fun onServiceDisconnected(name: ComponentName?) {
-            Log.d(TAG, "Unified Service Disconnected")
-            unifiedService = null
-            isServiceBound = false
-            setNotRunning()
-        }
-    }
-
     private var _binding: FragmentHomeBinding? = null
+    val binding get() = _binding!!
     private lateinit var homeViewModel: HomeViewModel
     private lateinit var logsViewModel: LogsViewModel
 
     private lateinit var serviceSwitch: MaterialSwitch
 
     private var vpnPrepareLauncher: ActivityResultLauncher<Intent>? = null
-    private var pendingServiceIntent: Intent? = null
 
-    // This property is only valid between onCreateView and
-    // onDestroyView.
-    private val binding get() = _binding!!
+    /** Timestamp of the last processed toggle, used to ignore burst-clicks. */
+    private var lastToggleMs = 0L
 
-    // Listener to trigger when the user toggles the switch
+    // Listener to trigger when the user toggles the switch.
+    // Debounced: rapid toggles within 800 ms are reverted and ignored to prevent
+    // overlapping start/stop coroutines.
     private val checkedChangeListener =
         CompoundButton.OnCheckedChangeListener { _, isChecked ->
+            val now = System.currentTimeMillis()
+            if (now - lastToggleMs < 800L) {
+                // Too soon — revert the visual state without re-triggering this listener.
+                setSwitch(!isChecked)
+                return@OnCheckedChangeListener
+            }
+            lastToggleMs = now
             toggleSwitch(isChecked)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        homeViewModel = ViewModelProvider(this)[HomeViewModel::class.java]
 
         // construct result receiver for VPN preparation
-        vpnPrepareLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            // Check if fragment is still attached
-            if (!isAdded || context == null) {
-                Log.w(TAG, "Fragment not attached, ignoring VPN preparation result")
-                return@registerForActivityResult
-            }
-            
-            if (result.resultCode == Activity.RESULT_OK) {
-                // VPN permission granted, now start the service
-                Log.d(TAG, "VPN permission granted")
-                pendingServiceIntent?.let { serviceIntent ->
-                    requireContext().startForegroundService(serviceIntent)
-                    bindUnifiedService()
-                    pendingServiceIntent = null
-                    Snackbar.make(
-                        requireActivity().findViewById(android.R.id.content),
-                        "Service started", Snackbar.LENGTH_LONG
-                    ).show()
+        vpnPrepareLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                // Check if fragment is still attached
+                if (!isAdded || context == null) {
+                    Log.w(TAG, "Fragment not attached, ignoring VPN preparation result")
+                    return@registerForActivityResult
                 }
-            } else {
-                // VPN permission denied, reset switch
-                Log.w(TAG, "VPN permission denied")
-                pendingServiceIntent = null
-                setNotRunning()
-                serviceSwitch.isEnabled = true
-                Snackbar.make(
-                    requireActivity().findViewById(android.R.id.content),
-                    "VPN permission denied", Snackbar.LENGTH_SHORT
-                ).show()
+
+                if (result.resultCode == Activity.RESULT_OK) {
+                    // VPN permission granted, now start the service
+                    Log.d(TAG, "VPN permission granted")
+                    homeViewModel.pendingServiceIntent?.let { serviceIntent ->
+                        requireContext().applicationContext.startForegroundService(serviceIntent)
+                        bindUnifiedService()
+                        homeViewModel.pendingServiceIntent = null
+                        Snackbar
+                            .make(
+                                requireActivity().findViewById(android.R.id.content),
+                                "Service started",
+                                Snackbar.LENGTH_LONG,
+                            ).show()
+                    }
+                } else {
+                    // VPN permission denied, reset switch
+                    Log.w(TAG, "VPN permission denied")
+                    homeViewModel.pendingServiceIntent = null
+                    setNotRunning()
+                    serviceSwitch.isEnabled = true
+                    Snackbar
+                        .make(
+                            requireActivity().findViewById(android.R.id.content),
+                            "VPN permission denied",
+                            Snackbar.LENGTH_SHORT,
+                        ).show()
+                }
             }
-        }
     }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val card = binding.card
         card.setOnLongClickListener {
-            Snackbar.make(
-                requireActivity().findViewById(android.R.id.content),
-                "spaceship core version: ${Spaceship_aar.getVersionCode()}",
-                Snackbar.LENGTH_SHORT
-            ).show()
+            Snackbar
+                .make(
+                    requireActivity().findViewById(android.R.id.content),
+                    "spaceship core version: ${Spaceship_aar.getVersionCode()}",
+                    Snackbar.LENGTH_SHORT,
+                ).show()
             true
         }
-        homeViewModel = ViewModelProvider(this)[HomeViewModel::class.java]
         val profile = binding.profile
         homeViewModel.profile.observe(viewLifecycleOwner) {
             profile.text = it
@@ -154,7 +173,10 @@ class HomeFragment : Fragment() {
         return binding.root
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?,
+    ) {
         super.onViewCreated(view, savedInstanceState)
         Log.d(TAG, "onViewCreated")
         // Schedule the listener to be added after state restoration
@@ -195,10 +217,12 @@ class HomeFragment : Fragment() {
         // check if resource is extracted
         if (Runtime(requireContext()).resourceVersion < Resource.VERSION) {
             if (isChecked) setSwitch(false)
-            Snackbar.make(
-                requireActivity().findViewById(android.R.id.content),
-                "Please wait for the resource extraction", Snackbar.LENGTH_SHORT
-            ).show()
+            Snackbar
+                .make(
+                    requireActivity().findViewById(android.R.id.content),
+                    "Please wait for the resource extraction",
+                    Snackbar.LENGTH_SHORT,
+                ).show()
             return
         }
 
@@ -222,17 +246,19 @@ class HomeFragment : Fragment() {
     private fun startService() {
         Log.i(TAG, "home: starting unified service")
         serviceSwitch.isEnabled = false
-        val ctx = requireContext()
+        val ctx = requireContext().applicationContext
 
         // get and validate config
         val settings = Settings(ctx)
         if (!settings.validate()) {
             setNotRunning()
             serviceSwitch.isEnabled = true
-            Snackbar.make(
-                requireActivity().findViewById(android.R.id.content),
-                "Configuration not valid", Snackbar.LENGTH_SHORT
-            ).show()
+            Snackbar
+                .make(
+                    requireActivity().findViewById(android.R.id.content),
+                    "Configuration not valid",
+                    Snackbar.LENGTH_SHORT,
+                ).show()
             return
         }
         // clear logs
@@ -244,15 +270,18 @@ class HomeFragment : Fragment() {
             homeViewModel.startConnectivityDiscovery(ctx)
         }
 
-        val configString = settings.toJson()
-        val serviceIntent = Intent(ctx, UnifiedVPNService::class.java).apply {
-            putExtra("config", configString)
-            putExtra("port", settings.socksPort)
-            putExtra("remote_dns", settings.enableRemoteDns)
-            putExtra("ipv6", settings.enableIpv6)
-            putExtra("bypass", settings.bypass)
-            putExtra("vpn_mode", settings.enableVPN)
-        }
+        val dnsPort = if (settings.enableRemoteDns) ServiceUtil.findFreePort() else null
+        val configString = settings.toJson(dnsPort)
+        val serviceIntent =
+            Intent(ctx, UnifiedVPNService::class.java).apply {
+                putExtra("config", configString)
+                putExtra("port", settings.socksPort)
+                putExtra("remote_dns", settings.enableRemoteDns)
+                putExtra("ipv6", settings.enableIpv6)
+                putExtra("bypass", settings.bypass)
+                putExtra("vpn_mode", settings.enableVPN)
+                if (dnsPort != null) putExtra("dns_port", dnsPort)
+            }
 
         // check if we need to prepare vpn service
         if (settings.enableVPN) {
@@ -260,7 +289,7 @@ class HomeFragment : Fragment() {
             // prepare if not prepared before
             if (intent != null) {
                 // Store the service intent for later use after VPN preparation
-                pendingServiceIntent = serviceIntent
+                homeViewModel.pendingServiceIntent = serviceIntent
                 vpnPrepareLauncher!!.launch(intent)
                 // Don't show success message yet, wait for VPN permission
                 serviceSwitch.isEnabled = true
@@ -276,10 +305,12 @@ class HomeFragment : Fragment() {
             bindUnifiedService()
         }
 
-        Snackbar.make(
-            requireActivity().findViewById(android.R.id.content),
-            "Service started", Snackbar.LENGTH_LONG
-        ).show()
+        Snackbar
+            .make(
+                requireActivity().findViewById(android.R.id.content),
+                "Service started",
+                Snackbar.LENGTH_LONG,
+            ).show()
 
         serviceSwitch.isEnabled = true
     }
@@ -291,11 +322,11 @@ class HomeFragment : Fragment() {
         // stop connectivity if needed
         homeViewModel.stopConnectivityDiscovery()
 
-        val ctx = requireContext()
+        val ctx = requireContext().applicationContext
 
         // Tell the service to stop itself cleanly first
         unifiedService?.stopService(false)
-        
+
         // stop unified service
         unbindUnifiedService()
         val serviceIntent = Intent(ctx, UnifiedVPNService::class.java)
@@ -306,10 +337,12 @@ class HomeFragment : Fragment() {
 
         // final prompt
         serviceSwitch.isEnabled = true
-        Snackbar.make(
-            requireActivity().findViewById(android.R.id.content),
-            "Service stopped", Snackbar.LENGTH_LONG
-        ).show()
+        Snackbar
+            .make(
+                requireActivity().findViewById(android.R.id.content),
+                "Service stopped",
+                Snackbar.LENGTH_LONG,
+            ).show()
     }
 
     private fun unbindUnifiedService() {
@@ -327,9 +360,10 @@ class HomeFragment : Fragment() {
 
     private fun bindUnifiedService() {
         if (!isServiceBound) {
-            val serviceIntent = Intent(requireContext(), UnifiedVPNService::class.java)
+            val ctx = context?.applicationContext ?: return
+            val serviceIntent = Intent(ctx, UnifiedVPNService::class.java)
             try {
-                val bound = requireContext().bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+                val bound = ctx.bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
                 if (!bound) {
                     Log.w(TAG, "Failed to bind to service")
                 }
@@ -339,12 +373,12 @@ class HomeFragment : Fragment() {
         }
     }
 
-    private fun setRunning(){
+    private fun setRunning() {
         setSwitch(true)
         homeViewModel.setProfile(Settings(requireContext()).profileName)
     }
 
-    private fun setNotRunning(){
+    private fun setNotRunning() {
         setSwitch(false)
         homeViewModel.setProfile("")
     }

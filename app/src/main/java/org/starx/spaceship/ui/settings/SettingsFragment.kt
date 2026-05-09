@@ -28,7 +28,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
         const val TAG = "SettingsFragment"
     }
 
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+    override fun onCreatePreferences(
+        savedInstanceState: Bundle?,
+        rootKey: String?,
+    ) {
         setPreferencesFromResource(R.xml.root_preferences, rootKey)
         applyConstrains()
     }
@@ -36,36 +39,44 @@ class SettingsFragment : PreferenceFragmentCompat() {
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
-        savedInstanceState: Bundle?
+        savedInstanceState: Bundle?,
     ): View {
-        requireActivity().addMenuProvider(object : MenuProvider {
-            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
-                menuInflater.inflate(R.menu.configuration_menu, menu)
-            }
-
-            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
-                return when (menuItem.itemId) {
-                    R.id.action_export -> {
-                        handleExport()
-                        true
-                    }
-                    R.id.action_import -> {
-                        handleImport()
-                        refresh()
-                        true
-                    }
-                    else -> false
+        requireActivity().addMenuProvider(
+            object : MenuProvider {
+                override fun onCreateMenu(
+                    menu: Menu,
+                    menuInflater: MenuInflater,
+                ) {
+                    menuInflater.inflate(R.menu.configuration_menu, menu)
                 }
-            }
 
-        }, viewLifecycleOwner)
+                override fun onMenuItemSelected(menuItem: MenuItem): Boolean =
+                    when (menuItem.itemId) {
+                        R.id.action_export -> {
+                            handleExport()
+                            true
+                        }
+
+                        R.id.action_import -> {
+                            handleImport()
+                            refresh()
+                            true
+                        }
+
+                        else -> {
+                            false
+                        }
+                    }
+            },
+            viewLifecycleOwner,
+        )
         return super.onCreateView(inflater, container, savedInstanceState)
     }
 
     private fun handleImport() {
         val ctx = requireContext()
         val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        
+
         if (!clipboardManager.hasPrimaryClip()) {
             Toast.makeText(ctx, "Copy configuration to clipboard first!", Toast.LENGTH_SHORT).show()
             return
@@ -85,13 +96,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
         try {
             val cfg = JsonFactory.processor.decodeFromString(Configuration.serializer(), clip)
-            
+
             // Validate the configuration before saving
             if (cfg.serverAddress.isBlank() || cfg.uuid.isBlank()) {
                 Toast.makeText(ctx, "Invalid configuration: missing required fields", Toast.LENGTH_SHORT).show()
                 return
             }
-            
+
             Settings(ctx).saveConfiguration(cfg)
             Toast.makeText(ctx, "Configuration imported successfully", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -102,14 +113,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     private fun handleExport() {
         val ctx = requireContext()
-        
+
         try {
             val settings = Settings(ctx)
             if (!settings.validate()) {
                 Toast.makeText(ctx, "Cannot export: configuration is invalid", Toast.LENGTH_SHORT).show()
                 return
             }
-            
+
             val configJson = settings.toJson()
             val clipboardManager = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clipData = ClipData.newPlainText("config", configJson)
@@ -131,30 +142,31 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     private fun applyConstrains() {
-        val portPreferences = listOf(
-            getString(R.string.server_port_key),
-            getString(R.string.inbound_socks_port_key),
-            getString(R.string.inbound_http_port_key)
-        ).mapNotNull { key -> 
-            findPreference<EditTextPreference>(key)
-        }
-        
+        val portPreferences =
+            listOf(
+                getString(R.string.server_port_key),
+                getString(R.string.inbound_socks_port_key),
+                getString(R.string.inbound_http_port_key),
+            ).mapNotNull { key ->
+                findPreference<EditTextPreference>(key)
+            }
+
         portPreferences.forEach { pref ->
             EditTextUtil(pref).setNumberOnly(1, 65535)
         }
-        
+
         findPreference<EditTextPreference>(getString(R.string.server_mux_key))?.let { pref ->
             EditTextUtil(pref).setNumberOnly(0, 255)
         }
-        
+
         findPreference<EditTextPreference>(getString(R.string.server_buffer_key))?.let { pref ->
             EditTextUtil(pref).setNumberOnly(1, 65535).setSuffix("KB")
         }
-        
+
         findPreference<EditTextPreference>(getString(R.string.user_id_key))?.let { pref ->
             EditTextUtil(pref).setPasswordWithMask()
         }
-        
+
         findPreference<EditTextPreference>(getString(R.string.server_idle_timeout_key))?.let { pref ->
             EditTextUtil(pref).setNumberOnly().setSuffix("s")
         }

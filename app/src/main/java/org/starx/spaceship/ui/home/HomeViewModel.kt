@@ -11,21 +11,31 @@ class HomeViewModel : ViewModel() {
         const val TAG = "HomeViewModel"
     }
 
-    private val _profile = MutableLiveData<String>().apply {
-        value = ""
-    }
+    private val _profile =
+        MutableLiveData<String>().apply {
+            value = ""
+        }
     val profile: LiveData<String> = _profile
+
     fun setProfile(profile: String) {
         _profile.value = profile
     }
 
-    private val _localIp = MutableLiveData<String>().apply {
-        value = ""
-    }
+    private val _localIp =
+        MutableLiveData<String>().apply {
+            value = ""
+        }
     val localIp: LiveData<String> = _localIp
+
     fun setLocalIp(ip: String) {
         _localIp.value = ip
     }
+
+    /**
+     * Pending service intent to be used after VPN preparation result is received.
+     * Storing this in ViewModel ensures it survives configuration changes (rotation).
+     */
+    var pendingServiceIntent: android.content.Intent? = null
 
     private var connectivity: Connectivity? = null
     private var isDiscoveryActive = false
